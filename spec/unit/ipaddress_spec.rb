@@ -24,6 +24,14 @@ describe "ipaddress fact" do
       Facter::Util::Resolution.stubs(:exec).with('/sbin/ip addr show').returns(ifconfig)
       Facter.fact(:ipaddress).value.should == "198.245.51.174"
     end
+
+    it "should return appropriate nics for trunked and virtual interfaces" do
+      ifconfig = my_fixture_read('linux_trunked_interface_eth0.160')
+      FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(true)
+      FileTest.stubs(:exists?).with("/sbin/ip").returns(false)
+      Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig').returns(ifconfig)
+      Facter.fact(:ipaddress_eth0_160).value.should = "192.168.190.58"
+    end
   end
 
   describe "on FreeBSD" do

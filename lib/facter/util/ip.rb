@@ -35,6 +35,78 @@ module Facter::Util::IP
     }
   }
 
+  def self.get_address_after_token(output, token, return_first=false, ignore=/^127\./)
+    ip = nil
+
+    output.scan(/#{token}([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/).each do |match|
+      match = match.first
+      unless match =~ ignore
+        ip = match
+        break if return_first
+      end
+    end
+
+    ip
+  end
+
+  def self.find_exec
+    files = {
+      :linux => {
+        :execs => ['/sbin/ifconfig', '/sbin/ip addr show'],
+      },
+      :bsd => {
+        :aliases  => [:openbsd, :netbsd, :freebsd, :darwin, :"gnu/kfreebsd", :dragonfly],
+        :execs => ['/sbin/ifconfig'],
+      },
+      :sunos => {
+        :execs => ['/sbin/ifconfig']
+      },
+      :aix => {
+        :execs => ['/sbin/ifconfig']
+      }
+    }
+
+    kernel = Facter.value(:kernel).downcase.to_sym
+    execs = files[kernel][:execs]
+    execs.each do |entry|
+      # Strip back to just the file
+      file = entry.to_s.split(' ').first
+      if FileTest.exists?(file)
+        return entry
+        break
+      end
+    end
+  end
+
+  def self.find_token(exec)
+    tokens = {
+      '/sbin/ifconfig' => 'inet addr: ',
+      '/sbin/ip addr show' => 'inet ',
+    }
+
+    token = tokens[exec]
+    return token
+  end
+
+  def self.ipaddress(interface=nil)
+    fact = :ipaddress
+    exec = Facter::Util::IP.find_exec
+    token = Facter::Util::IP.find_token(exec)
+
+    unless interface.nil?
+      exec = exec << interface
+      fact = "ipaddress_" << interface
+    end
+    Facter.add(fact) do
+      has_weight 150
+      confine :kernel => :linux
+      setcode do
+        output = Facter::Util::Resolution.exec(exec)
+        Facter::Util::IP.get_address_after_token(output, token)
+      end
+    end
+  end
+
   # Convert an interface name into purely alphanumeric characters.
   def self.alphafy(interface)
     interface.gsub(/[^a-z0-9_]/i, '_')
@@ -163,7 +235,6 @@ module Facter::Util::IP
       value = hwaddrre.match(bondinfo.to_s)[1].upcase
     else
       output_int = get_output_for_interface_and_label(interface, label)
-
       output_int.each_line do |s|
         if s =~ regex
           value = $1

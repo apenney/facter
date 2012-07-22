@@ -22,47 +22,23 @@
 #   checking this is a useful IP address.
 #
 
-def get_address_after_token(output, token, return_first=false, ignore=/^127\./)
-  ip = nil
+require 'facter/util/ip'
 
-  output.scan(/#{token}([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/).each do |match|
-    match = match.first
-    unless match =~ ignore
-      ip = match
-      break if return_first
-    end
-  end
+Facter::Util::IP.ipaddress
 
-  ip
-end
-
-Facter.add(:ipaddress) do
-  has_weight 100
-  confine :kernel => :linux
-  setcode do
+  def get_address_after_token(output, token, return_first=false, ignore=/^127\./)
     ip = nil
-    if FileTest.exists? '/sbin/ifconfig'
-      output = Facter::Util::Resolution.exec('/sbin/ifconfig')
-      get_address_after_token(output, 'inet addr:')
-    else
-      nil
-    end
-  end
-end
 
-Facter.add(:ipaddress) do
-  has_weight 50
-  confine :kernel => :linux
-  setcode do
-    ip = nil
-    if FileTest.exists? '/sbin/ip'
-      output = Facter::Util::Resolution.exec('/sbin/ip addr show')
-      get_address_after_token(output, 'inet ')
-    else
-      nil
+    output.scan(/#{token}([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/).each do |match|
+      match = match.first
+      unless match =~ ignore
+        ip = match
+        break if return_first
+      end
     end
+
+    ip
   end
-end
 
 Facter.add(:ipaddress) do
   has_weight 100
