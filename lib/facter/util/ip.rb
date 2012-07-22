@@ -124,14 +124,8 @@ module Facter::Util::IP
       exec = exec << interface
       fact = "ipaddress_" << interface
     end
-    Facter.add(fact) do
-      has_weight 150
-      confine :kernel => :linux
-      setcode do
-        output = Facter::Util::Resolution.exec(exec)
-        Facter::Util::IP.get_address_after_token(output, token)
-      end
-    end
+    output = Facter::Util::Resolution.exec(exec)
+    Facter::Util::IP.get_address_after_token(output, token)
   end
 
   # Convert an interface name into purely alphanumeric characters.

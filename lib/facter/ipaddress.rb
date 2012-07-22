@@ -24,7 +24,13 @@
 
 require 'facter/util/ip'
 
-Facter::Util::IP.ipaddress
+Facter.add(:ipaddress) do
+  has_weight 150
+  confine :kernel => :linux
+  setcode do
+    Facter::Util::IP.ipaddress(nil)
+  end
+end
 
   def get_address_after_token(output, token, return_first=false, ignore=/^127\./)
     ip = nil
