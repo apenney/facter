@@ -29,7 +29,7 @@ describe Facter::Util::IP do
   it "should return a list with a single interface and the loopback interface on Linux with a single interface" do
     linux_ifconfig = my_fixture_read("linux_ifconfig_all_with_single_interface")
     Facter::Util::IP.stubs(:get_all_interface_output).returns(linux_ifconfig)
-    Facter::Util::IP.get_interfaces().should == ["eth0", "lo"]
+    Facter::Util::IP.get_interfaces().should =~ ["eth0", "lo"]
   end
 
   it "should return a list two interfaces on Darwin with two interfaces" do
