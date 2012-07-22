@@ -67,7 +67,10 @@ module Facter::Util::IP
     }
 
     kernel = Facter.value(:kernel).downcase.to_sym
-    execs = files[kernel][:execs]
+    unless map = files[kernel] || files.values.find { |tmp| tmp[:aliases] and tmp[:aliases].include?(kernel) }
+      return []
+    end
+    execs = map[:execs]
     execs.each do |entry|
       # Strip back to just the file
       file = entry.to_s.split(' ').first
