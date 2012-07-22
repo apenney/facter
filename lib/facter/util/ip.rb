@@ -35,6 +35,46 @@ module Facter::Util::IP
     }
   }
 
+  INTERFACE_MAP = {
+    :linux => {
+      :methods => {
+        :ifconfig => {
+          :exec  => '/sbin/ifconfig',
+          :token => 'inet addr: ',
+        },
+        :ip => {
+          :exec  => '/sbin/ip addr show',
+          :token => 'inet ',
+        },
+      },
+    },
+    :bsd => {
+      :aliases  => [:openbsd, :netbsd, :freebsd, :darwin, :"gnu/kfreebsd", :dragonfly],
+      :methods => {
+        :ifconfig => {
+          :exec  => '/sbin/ifconfig',
+          :token => 'inet addr: ',
+        },
+      },
+    },
+    :sunos => {
+      :methods => {
+        :ifconfig => {
+          :exec  => '/sbin/ifconfig',
+          :token => 'inet addr: ',
+        },
+      },
+    },
+    :aix => {
+      :methods => {
+        :ifconfig => {
+          :exec  => '/sbin/ifconfig',
+          :token => 'inet addr: ',
+        },
+      },
+    },
+  }
+
   def self.get_address_after_token(output, token, return_first=false, ignore=/^127\./)
     ip = nil
 
@@ -50,45 +90,29 @@ module Facter::Util::IP
   end
 
   def self.find_exec
-    files = {
-      :linux => {
-        :execs => ['/sbin/ifconfig', '/sbin/ip addr show'],
-      },
-      :bsd => {
-        :aliases  => [:openbsd, :netbsd, :freebsd, :darwin, :"gnu/kfreebsd", :dragonfly],
-        :execs => ['/sbin/ifconfig'],
-      },
-      :sunos => {
-        :execs => ['/sbin/ifconfig']
-      },
-      :aix => {
-        :execs => ['/sbin/ifconfig']
-      }
-    }
-
     kernel = Facter.value(:kernel).downcase.to_sym
-    unless map = files[kernel] || files.values.find { |tmp| tmp[:aliases] and tmp[:aliases].include?(kernel) }
+    unless map = INTERFACE_MAP[kernel] || INTERFACE_MAP.values.find { |tmp| tmp[:aliases] and tmp[:aliases].include?(kernel) }
       return []
     end
-    execs = map[:execs]
-    execs.each do |entry|
+    map[:methods].each do |name, method|
       # Strip back to just the file
-      file = entry.to_s.split(' ').first
+      file = method[:exec].split(' ').first
       if FileTest.exists?(file)
-        return entry
+        return method[:exec]
         break
       end
     end
   end
 
   def self.find_token(exec)
-    tokens = {
-      '/sbin/ifconfig' => 'inet addr: ',
-      '/sbin/ip addr show' => 'inet ',
-    }
-
-    token = tokens[exec]
-    return token
+    kernel = Facter.value(:kernel).downcase.to_sym
+    unless map = INTERFACE_MAP[kernel] || INTERFACE_MAP.values.find { |tmp| tmp[:aliases] and tmp[:aliases].include?(kernel) }
+      return []
+    end
+    map[:methods].each do |name, method|
+      token = method[:token]
+      return token
+    end
   end
 
   def self.ipaddress(interface=nil)

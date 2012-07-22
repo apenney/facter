@@ -232,26 +232,36 @@ describe Facter::Util::IP do
     Facter::Util::IP.get_arp_value("eth0").should == "00:00:0c:9f:f0:04"
   end
 
-  describe "find_execs" do
+  describe "the find_execs function" do
 
-    it "on linux it should return appropriate executables for /sbin/ifconfig" do
+    it "should return appropriate executables for /sbin/ifconfig on linux" do
       Facter.stubs(:value).with(:kernel).returns("Linux")
       FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(true)
       FileTest.stubs(:exists?).with("/sbin/ip").returns(false)
       Facter::Util::IP.find_exec.should == "/sbin/ifconfig"
     end
 
-    it "on linux it should return appropriate executables for /sbin/ip" do
+    it "should return appropriate executables for /sbin/ip on linux" do
       Facter.stubs(:value).with(:kernel).returns("Linux")
       FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(false)
       FileTest.stubs(:exists?).with("/sbin/ip").returns(true)
       Facter::Util::IP.find_exec.should == "/sbin/ip addr show"
     end
 
-    it "on FreeBSD it should return appropriate executables" do
+    it "should return appropriate executables on freebsd" do
       Facter.stubs(:value).with(:kernel).returns("FreeBSD")
       Facter::Util::IP.find_exec.should == "/sbin/ifconfig"
     end
+
+  end
+
+  describe "the find_tokens function" do
+
+    it "should return an appropriate token for ipconfig on linux" do
+      Facter.stubs(:value).with(:kernel).returns("Linux")
+      Facter::Util::IP.find_token("/sbin/ifconfig").should == 'inet addr: '
+    end
+
   end
 
   describe "on Windows" do
