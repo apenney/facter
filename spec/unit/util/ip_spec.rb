@@ -27,30 +27,34 @@ describe Facter::Util::IP do
   end
 
   it "should return a list with a single interface and the loopback interface on Linux with a single interface" do
-    linux_ifconfig = my_fixture_read("linux_ifconfig_all_with_single_interface")
-    Facter::Util::IP.stubs(:get_all_interface_output).returns(linux_ifconfig)
+    proc = my_fixture_read("linux_proc_with_single_interface")
+    File.stubs(:open).with('/proc/net/dev').returns(proc)
     Facter::Util::IP.get_interfaces().should =~ ["eth0", "lo"]
   end
 
   it "should return a list two interfaces on Darwin with two interfaces" do
+    Facter.stubs(:value).with(:kernel).returns(:darwin)
     darwin_ifconfig = my_fixture_read("darwin_ifconfig_all_with_multiple_interfaces")
     Facter::Util::IP.stubs(:get_all_interface_output).returns(darwin_ifconfig)
     Facter::Util::IP.get_interfaces().should == ["lo0", "en0"]
   end
 
   it "should return a list two interfaces on Solaris with two interfaces multiply reporting" do
+    Facter.stubs(:value).with(:kernel).returns(:sunos)
     solaris_ifconfig = my_fixture_read("solaris_ifconfig_all_with_multiple_interfaces")
     Facter::Util::IP.stubs(:get_all_interface_output).returns(solaris_ifconfig)
     Facter::Util::IP.get_interfaces().should == ["lo0", "e1000g0"]
   end
 
   it "should return a list three interfaces on HP-UX with three interfaces multiply reporting" do
+    Facter.stubs(:value).with(:kernel).returns(:"hp-ux")
     hpux_netstat = my_fixture_read("hpux_netstat_all_interfaces")
     Facter::Util::IP.stubs(:get_all_interface_output).returns(hpux_netstat)
     Facter::Util::IP.get_interfaces().should == ["lan1", "lan0", "lo0"]
   end
 
   it "should return a list of six interfaces on a GNU/kFreeBSD with six interfaces" do
+    Facter.stubs(:value).with(:kernel).returns(:"gnu/kfreebsd")
     kfreebsd_ifconfig = my_fixture_read("debian_kfreebsd_ifconfig")
     Facter::Util::IP.stubs(:get_all_interface_output).returns(kfreebsd_ifconfig)
     Facter::Util::IP.get_interfaces().should == ["em0", "em1", "bge0", "bge1", "lo0", "vlan0"]

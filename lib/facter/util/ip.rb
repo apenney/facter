@@ -30,27 +30,27 @@ module Facter::Util::IP
     :linux => {
       :methods => {
         :ipv4 => {
-          :ifconfig => {
-            :ipaddress  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
-            :exec  => '/sbin/ifconfig',
-            :token => 'inet addr: ',
-          },
           :ip => {
             :ipaddress  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
             :exec  => '/sbin/ip addr show',
             :token => 'inet ',
           },
+          :ifconfig => {
+            :ipaddress  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
+            :exec  => '/sbin/ifconfig',
+            :token => 'inet addr: ',
+          },
         },
         :ipv6 => {
-          :ifconfig => {
-            :ipaddress => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
-            :exec  => '/sbin/ifconfig',
-            :token => 'inet6 addr: ',
-          },
           :ip => {
             :ipaddress => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
             :exec  => '/sbin/ip addr show',
             :token => 'inet6 ',
+          },
+          :ifconfig => {
+            :ipaddress => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
+            :exec  => '/sbin/ifconfig',
+            :token => 'inet6 addr: ',
           },
         },
       },
@@ -217,17 +217,29 @@ module Facter::Util::IP
   end
 
   def self.get_interfaces
-    return [] unless output = Facter::Util::IP.get_all_interface_output()
 
-    # windows interface names contain spaces and are quoted and can appear multiple
-    # times as ipv4 and ipv6
-    return output.scan(/\s* connected\s*(\S.*)/).flatten.uniq if Facter.value(:kernel) == 'windows'
+    case Facter.value(:kernel)
+    when 'Linux'
+      interfaces = []
+      File.open('/proc/net/dev').each_line do |line|
+        line.match(/\w+\d*:/) do |m|
+          interfaces << m.to_s.chomp(':') unless m.nil?
+        end
+      end
+      interfaces.sort!
+    else
+      return [] unless output = Facter::Util::IP.get_all_interface_output()
 
-    # Our regex appears to be stupid, in that it leaves colons sitting
-    # at the end of interfaces.  So, we have to trim those trailing
-    # characters.  I tried making the regex better but supporting all
-    # platforms with a single regex is probably a bit too much.
-    output.scan(/^\S+/).collect { |i| i.sub(/:$/, '') }.uniq
+      # windows interface names contain spaces and are quoted and can appear multiple
+      # times as ipv4 and ipv6
+      return output.scan(/\s* connected\s*(\S.*)/).flatten.uniq if Facter.value(:kernel) == 'windows'
+
+      # Our regex appears to be stupid, in that it leaves colons sitting
+      # at the end of interfaces.  So, we have to trim those trailing
+      # characters.  I tried making the regex better but supporting all
+      # platforms with a single regex is probably a bit too much.
+      output.scan(/^\S+/).collect { |i| i.sub(/:$/, '') }.uniq
+    end
   end
 
   def self.get_all_interface_output()
