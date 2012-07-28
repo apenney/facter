@@ -108,6 +108,7 @@ describe Facter::Util::IP do
   it "should return ipaddress information for HP-UX" do
     hpux_ifconfig_interface = my_fixture_read("hpux_ifconfig_single_interface")
 
+    FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(true)
     Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig lan0').returns(hpux_ifconfig_interface)
     Facter.stubs(:value).with(:kernel).returns("HP-UX")
 
@@ -115,21 +116,22 @@ describe Facter::Util::IP do
   end
 
   it "should return macaddress information for HP-UX" do
-    hpux_ifconfig_interface = my_fixture_read("hpux_ifconfig_single_interface")
+    hpux_lanscan_output = my_fixture_read("hpux_lanscan_single_output")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("lan0").returns(hpux_ifconfig_interface)
+    FileTest.stubs(:exists?).with("/sbin/lanscan").returns(true)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/lanscan -a lan0').returns(hpux_lanscan_output)
     Facter.stubs(:value).with(:kernel).returns("HP-UX")
 
-    Facter::Util::IP.get_interface_value("lan0", "macaddress").should == "00:13:21:BD:9C:B7"
+    Facter::Util::IP.macaddress("lan0").should == "00306e3899af"
   end
 
   it "should return macaddress with leading zeros stripped off for GNU/kFreeBSD" do
     kfreebsd_ifconfig = my_fixture_read("debian_kfreebsd_ifconfig")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("em0").returns(kfreebsd_ifconfig)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig em0').returns(kfreebsd_ifconfig)
     Facter.stubs(:value).with(:kernel).returns("GNU/kFreeBSD")
 
-    Facter::Util::IP.get_interface_value("em0", "macaddress").should == "0:11:a:59:67:90"
+    Facter::Util::IP.macaddress("em0").should == "0:11:a:59:67:90"
   end
 
   it "should return netmask information for HP-UX" do
@@ -154,19 +156,19 @@ describe Facter::Util::IP do
   it "should return interface information for FreeBSD supported via an alias" do
     ifconfig_interface = my_fixture_read("6.0-STABLE_FreeBSD_ifconfig")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("fxp0").returns(ifconfig_interface)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig fxp0').returns(ifconfig_interface)
     Facter.stubs(:value).with(:kernel).returns("FreeBSD")
 
-    Facter::Util::IP.get_interface_value("fxp0", "macaddress").should == "00:0e:0c:68:67:7c"
+    Facter::Util::IP.macaddress("fxp0").should == "00:0e:0c:68:67:7c"
   end
 
   it "should return macaddress information for OS X" do
-    ifconfig_interface = my_fixture_read("Mac_OS_X_10.5.5_ifconfig")
+    ifconfig_interface = my_fixture_read("osx_single_interface")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("en1").returns(ifconfig_interface)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig en1').returns(ifconfig_interface)
     Facter.stubs(:value).with(:kernel).returns("Darwin")
 
-    Facter::Util::IP.get_interface_value("en1", "macaddress").should == "00:1b:63:ae:02:66"
+    Facter::Util::IP.macaddress("en1").should == "00:1b:63:ae:02:66"
   end
 
   it "should return all interfaces correctly on OS X" do
@@ -271,32 +273,32 @@ describe Facter::Util::IP do
 
   end
 
-  describe "the find_tokens function" do
+  describe "the find_entry function" do
     describe "for ipaddress" do
       it "should return an appropriate token for ipconfig on linux for ipv4" do
         Facter.stubs(:value).with(:kernel).returns("Linux")
-        Facter::Util::IP.find_token('ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet addr: '
+        Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet addr: '
       end
 
-      it "should return an appropriate token for ipconfig on linux for ipv4" do
+      it "should return an appropriate token for ip on linux for ipv4" do
         Facter.stubs(:value).with(:kernel).returns("Linux")
-        Facter::Util::IP.find_token('ipaddress', 'ipv4', "/sbin/ip addr show").should == 'inet '
-      end
-
-      it "should return an appropriate token for ipconfig on linux for ipv6" do
-        Facter.stubs(:value).with(:kernel).returns("Linux")
-        Facter::Util::IP.find_token('ipaddress', 'ipv6', "/sbin/ifconfig").should == 'inet6 addr: '
+        Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv4', "/sbin/ip addr show").should == 'inet '
       end
 
       it "should return an appropriate token for ipconfig on linux for ipv6" do
         Facter.stubs(:value).with(:kernel).returns("Linux")
-        Facter::Util::IP.find_token('ipaddress', 'ipv6', "/sbin/ip addr show").should == 'inet6 '
+        Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv6', "/sbin/ifconfig").should == 'inet6 addr: '
+      end
+
+      it "should return an appropriate token for ip on linux for ipv6" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv6', "/sbin/ip addr show").should == 'inet6 '
       end
 
       [:sunos, :"hp-ux"].each do |platform|
         it "should return an appropriate token for ipconfig on #{platform} for ipv4" do
           Facter.stubs(:value).with(:kernel).returns(platform)
-          Facter::Util::IP.find_token('ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet '
+          Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet '
         end
       end
     end
@@ -304,7 +306,7 @@ describe Facter::Util::IP do
     [:freebsd, :netbsd, :openbsd, :darwin, :"gnu/kfreebsd"].each do |platform|
       it "should return an appropriate token for ipconfig on #{platform} for ipv4" do
         Facter.stubs(:value).with(:kernel).returns(platform)
-        Facter::Util::IP.find_token('ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet addr: '
+        Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet addr: '
       end
     end
 
