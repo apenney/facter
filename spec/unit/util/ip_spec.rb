@@ -110,7 +110,7 @@ describe Facter::Util::IP do
 
     FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(true)
     Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig lan0').returns(hpux_ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("HP-UX")
+    Facter.stubs(:value).with(:kernel).returns(:"hp-ux")
 
     Facter::Util::IP.ipaddress('lan0', 'ipv4').should == "168.24.80.71"
   end
@@ -119,8 +119,8 @@ describe Facter::Util::IP do
     hpux_lanscan_output = my_fixture_read("hpux_lanscan_single_output")
 
     FileTest.stubs(:exists?).with("/sbin/lanscan").returns(true)
-    Facter::Util::Resolution.stubs(:exec).with('/sbin/lanscan -a lan0').returns(hpux_lanscan_output)
-    Facter.stubs(:value).with(:kernel).returns("HP-UX")
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/lanscan -a 0').returns(hpux_lanscan_output)
+    Facter.stubs(:value).with(:kernel).returns(:"hp-ux")
 
     Facter::Util::IP.macaddress("lan0").should == "00306e3899af"
   end

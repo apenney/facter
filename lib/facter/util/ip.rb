@@ -272,12 +272,19 @@ module Facter::Util::IP
     case Facter.value(:kernel)
     when :linux
       return nil unless output = File.read("/sys/class/net/#{interface}/address")
+      macaddress = output
     else
       exec = Facter::Util::IP.find_exec('macaddress', 'ethernet')
       token = Facter::Util::IP.find_entry('token', 'macaddress', 'ethernet', exec)
       regex = Facter::Util::IP.find_entry('regex', 'macaddress', 'ethernet', exec)
-      command = "#{exec} #{interface}"
-      puts "e #{exec} t #{token} r #{regex}"
+
+      case Facter.value(:kernel)
+      when :"hp-ux"
+        ppa = interface.slice(-1)
+        command = "#{exec} #{ppa}"
+      else
+        command = "#{exec} #{interface}"
+      end
 
       output = Facter::Util::Resolution.exec(command)
       unless output =~ /interface #{interface} does not exist/
@@ -320,7 +327,6 @@ module Facter::Util::IP
           interfaces << m.to_s.chomp(':') unless m.nil?
         end
       end
-      puts interfaces
       interfaces.sort!
     when :freebsd, :netbsd, :openbsd, :dragonfly, :"gnu/kfreebsd", :darwin
       # Same command is used for ipv4 and ipv6
