@@ -247,7 +247,7 @@ module Facter::Util::IP
     exec6 = Facter::Util::IP.find_exec('ipv6')
 
     case Facter.value(:kernel)
-    when 'Linux', 'OpenBSD', 'NetBSD', 'FreeBSD', 'Darwin', 'GNU/kFreeBSD', 'DragonFly', 'SunOS'
+    when 'OpenBSD', 'NetBSD', 'FreeBSD', 'Darwin', 'GNU/kFreeBSD', 'DragonFly', 'SunOS'
       output = %x|#{exec4} -a|
     when 'HP-UX'
       output = %x{/bin/netstat -in | sed -e 1d}
