@@ -29,28 +29,30 @@ module Facter::Util::IP
   INTERFACE_MAP = {
     :linux => {
       :methods => {
-        :ipv4 => {
-          :ip => {
-            :ipaddress  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
-            :exec  => '/sbin/ip addr show',
-            :token => 'inet ',
+        :ipaddress => {
+          :ipv4 => {
+            :ip => {
+              :regex  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
+              :exec  => '/sbin/ip addr show',
+              :token => 'inet ',
+            },
+            :ifconfig => {
+              :regex  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet addr: ',
+            },
           },
-          :ifconfig => {
-            :ipaddress  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
-            :exec  => '/sbin/ifconfig',
-            :token => 'inet addr: ',
-          },
-        },
-        :ipv6 => {
-          :ip => {
-            :ipaddress => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
-            :exec  => '/sbin/ip addr show',
-            :token => 'inet6 ',
-          },
-          :ifconfig => {
-            :ipaddress => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
-            :exec  => '/sbin/ifconfig',
-            :token => 'inet6 addr: ',
+          :ipv6 => {
+            :ip => {
+              :regex => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
+              :exec  => '/sbin/ip addr show',
+              :token => 'inet6 ',
+            },
+            :ifconfig => {
+              :regex => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet6 addr: ',
+            },
           },
         },
       },
@@ -58,18 +60,20 @@ module Facter::Util::IP
     :bsdlike => {
       :aliases  => [:openbsd, :netbsd, :freebsd, :darwin, :"gnu/kfreebsd", :dragonfly],
       :methods => {
-        :ipv4 => {
-          :ifconfig => {
-            :ipaddress  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
-            :exec  => '/sbin/ifconfig',
-            :token => 'inet addr: ',
+        :ipaddress => {
+          :ipv4 => {
+            :ifconfig => {
+              :regex  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet addr: ',
+            },
           },
-        },
-        :ipv6 => {
-          :ifconfig => {
-            :ipaddress => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
-            :exec  => '/sbin/ifconfig',
-            :token => 'inet6 addr: ',
+          :ipv6 => {
+            :ifconfig => {
+              :regex => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet6 addr: ',
+            },
           },
         },
       },
@@ -77,54 +81,60 @@ module Facter::Util::IP
     :sunos => {
       :aliases => [:"hp-ux"],
       :methods => {
-        :ipv4 => {
-          :ifconfig => {
-            :ipaddress  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
-            :exec  => '/sbin/ifconfig',
-            :token => 'inet ',
+        :ipaddress => {
+          :ipv4 => {
+            :ifconfig => {
+              :regex  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet ',
+            },
           },
-        },
-        :ipv6 => {
-          :ifconfig => {
-            :ipaddress => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
-            :exec  => '/sbin/ifconfig',
-            :token => 'inet6 addr: ',
+          :ipv6 => {
+            :ifconfig => {
+              :regex => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet6 addr: ',
+            },
           },
         },
       },
     },
     :aix => {
       :methods => {
-        :ipv4 => {
-          :ifconfig => {
-            :ipaddress  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
-            :exec  => '/sbin/ifconfig -a',
-            :token => 'inet ',
+        :ipaddress => {
+          :ipv4 => {
+            :ifconfig => {
+              :regex  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
+              :exec  => '/sbin/ifconfig -a',
+              :token => 'inet ',
+            },
           },
-        },
-        :ipv6 => {
-          :ifconfig => {
-            :ipaddress => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
-            :exec  => '/sbin/ifconfig -a',
-            :token => 'inet6 ',
+          :ipv6 => {
+            :ifconfig => {
+              :regex => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
+              :exec  => '/sbin/ifconfig -a',
+              :token => 'inet6 ',
+            },
           },
         },
       },
     },
     :windows => {
       :methods => {
-        :ipv4 => {
-          :netsh => {
-            :ipaddress  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
-            :exec  => "#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ip show interface",
-            :token => 'IP Address:\s+',
+        :ipaddress => {
+          :ipv4 => {
+            :netsh => {
+              :regex  => /([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
+              :exec  => "#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ip show interface",
+              :token => 'IP Address:\s+',
+            },
           },
-        },
-        :ipv6 => {
-          :netsh => {
-            :ipaddress => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
-            :exec  => "#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ipv6 show interface",
-            :token => 'Address\s+',
+          :ipv6 => {
+            :netsh => {
+              :regex => /((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})/,
+              :exec  => "#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ipv6 show interface",
+              :token => 'Address\s+',
+            },
           },
         },
       },
@@ -132,22 +142,21 @@ module Facter::Util::IP
   }
 
   # Help find specific values in the INTERFACE_MAP nested hash to reduce boilerplate.
-  def self.find_value(hash)
+  def self.find_value(type, hash)
     kernel = Facter.value(:kernel).downcase.to_sym
     unless map = INTERFACE_MAP[kernel] || INTERFACE_MAP.values.find { |tmp| tmp[:aliases] and tmp[:aliases].include?(kernel) }
       return []
     end
-
-    return map[:methods][hash]
+    return map[:methods][type.to_sym][hash.to_sym]
   end
 
   # Extract the ipaddress from the output given a token, ipversion to parse and a regexp of addresses to ignore.
   def self.get_address_after_token(output, token, ipversion, return_first=false, ignore=/^127\./)
     ip = nil
-    methods = self.find_value(ipversion.to_sym)
+    methods = self.find_value('ipaddress', ipversion)
     methods.each do |name, method|
-      regexp = method[:ipaddress]
-      output.scan(/#{token}#{regexp}/).each do |match|
+      regex = method[:regex]
+      output.scan(/#{token}#{regex}/).each do |match|
         match = match.first
         unless match =~ ignore
           ip = match
@@ -158,9 +167,9 @@ module Facter::Util::IP
     ip
   end
 
-  def self.find_exec(ipversion)
+  def self.find_exec(type, ipversion)
     exec = nil
-    methods = self.find_value(ipversion.to_sym)
+    methods = self.find_value(type, ipversion)
     methods.each do |name, method|
       # Strip back to just the file
       file = method[:exec].split(' ').first
@@ -172,9 +181,9 @@ module Facter::Util::IP
     return exec
   end
 
-  def self.find_token(ipversion, exec)
+  def self.find_token(type, ipversion, exec)
     token = nil
-    methods = self.find_value(ipversion.to_sym)
+    methods = self.find_value(type, ipversion)
     methods.each do |name, method|
       if method[:exec] == exec
         token = method[:token]
@@ -184,8 +193,8 @@ module Facter::Util::IP
   end
 
   def self.ipaddress(interface=nil, ipversion='ipv4', ignore=/^127\./)
-    exec = Facter::Util::IP.find_exec(ipversion)
-    token = Facter::Util::IP.find_token(ipversion, exec)
+    exec = Facter::Util::IP.find_exec('ipaddress', ipversion)
+    token = Facter::Util::IP.find_token('ipaddress', ipversion, exec)
 
     unless interface.nil?
       exec = "#{exec} #{interface}"
@@ -243,8 +252,8 @@ module Facter::Util::IP
   end
 
   def self.get_all_interface_output()
-    exec4 = Facter::Util::IP.find_exec('ipv4')
-    exec6 = Facter::Util::IP.find_exec('ipv6')
+    exec4 = Facter::Util::IP.find_exec('ipaddress', 'ipv4')
+    exec6 = Facter::Util::IP.find_exec('ipaddress', 'ipv6')
 
     case Facter.value(:kernel)
     when 'OpenBSD', 'NetBSD', 'FreeBSD', 'Darwin', 'GNU/kFreeBSD', 'DragonFly', 'SunOS'
@@ -259,7 +268,7 @@ module Facter::Util::IP
   end
 
   def self.get_single_interface_output(interface)
-    exec = Facter::Util::IP.find_exec('ipv4')
+    exec = Facter::Util::IP.find_exec('ipaddress', 'ipv4')
     output = ""
 
     case Facter.value(:kernel)

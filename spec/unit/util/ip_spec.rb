@@ -240,83 +240,75 @@ describe Facter::Util::IP do
 
   describe "the find_execs function" do
 
-    it "should return appropriate executables for /sbin/ifconfig on linux" do
-      Facter.stubs(:value).with(:kernel).returns("Linux")
-      FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(true)
-      FileTest.stubs(:exists?).with("/sbin/ip").returns(false)
-      Facter::Util::IP.find_exec('ipv4').should == "/sbin/ifconfig"
-    end
+    describe "for ipaddress" do
+      it "should return appropriate executables for /sbin/ifconfig on linux" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(true)
+        FileTest.stubs(:exists?).with("/sbin/ip").returns(false)
+        Facter::Util::IP.find_exec('ipaddress', 'ipv4').should == "/sbin/ifconfig"
+      end
 
-    it "should return appropriate executables for /sbin/ip on linux" do
-      Facter.stubs(:value).with(:kernel).returns("Linux")
-      FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(false)
-      FileTest.stubs(:exists?).with("/sbin/ip").returns(true)
-      Facter::Util::IP.find_exec('ipv4').should == "/sbin/ip addr show"
-    end
+      it "should return appropriate executables for /sbin/ip on linux" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(false)
+        FileTest.stubs(:exists?).with("/sbin/ip").returns(true)
+        Facter::Util::IP.find_exec('ipaddress', 'ipv4').should == "/sbin/ip addr show"
+      end
 
-    it "should return appropriate executables for windows" do
-      Facter.stubs(:value).with(:kernel).returns("Windows")
-      FileTest.stubs(:exists?).with("/system32/netsh.exe").returns(true)
-      Facter::Util::IP.find_exec('ipv4').should == "/system32/netsh.exe interface ip show interface"
-    end
+      it "should return appropriate executables for windows" do
+        Facter.stubs(:value).with(:kernel).returns("Windows")
+        FileTest.stubs(:exists?).with("/system32/netsh.exe").returns(true)
+        Facter::Util::IP.find_exec('ipaddress', 'ipv4').should == "/system32/netsh.exe interface ip show interface"
+      end
 
-    [:freebsd, :netbsd, :openbsd, :sunos, :darwin, :"hp-ux", :"gnu/kfreebsd"].each do |platform|
-      it "should return appropriate executables on #{platform}" do
-        Facter.stubs(:value).with(:kernel).returns(platform)
-        Facter::Util::IP.find_exec('ipv4').should == "/sbin/ifconfig"
+      [:freebsd, :netbsd, :openbsd, :sunos, :darwin, :"hp-ux", :"gnu/kfreebsd"].each do |platform|
+        it "should return appropriate executables on #{platform}" do
+          Facter.stubs(:value).with(:kernel).returns(platform)
+          Facter::Util::IP.find_exec('ipaddress', 'ipv4').should == "/sbin/ifconfig"
+        end
       end
     end
 
   end
 
   describe "the find_tokens function" do
-    it "should return an appropriate token for ipconfig on linux for ipv4" do
-      Facter.stubs(:value).with(:kernel).returns("Linux")
-      Facter::Util::IP.find_token('ipv4', "/sbin/ifconfig").should == 'inet addr: '
-    end
+    describe "for ipaddress" do
+      it "should return an appropriate token for ipconfig on linux for ipv4" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        Facter::Util::IP.find_token('ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet addr: '
+      end
 
-    it "should return an appropriate token for ipconfig on linux for ipv4" do
-      Facter.stubs(:value).with(:kernel).returns("Linux")
-      Facter::Util::IP.find_token('ipv4', "/sbin/ip addr show").should == 'inet '
-    end
+      it "should return an appropriate token for ipconfig on linux for ipv4" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        Facter::Util::IP.find_token('ipaddress', 'ipv4', "/sbin/ip addr show").should == 'inet '
+      end
 
-    it "should return an appropriate token for ipconfig on linux for ipv6" do
-      Facter.stubs(:value).with(:kernel).returns("Linux")
-      Facter::Util::IP.find_token('ipv6', "/sbin/ifconfig").should == 'inet6 addr: '
-    end
+      it "should return an appropriate token for ipconfig on linux for ipv6" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        Facter::Util::IP.find_token('ipaddress', 'ipv6', "/sbin/ifconfig").should == 'inet6 addr: '
+      end
 
-    it "should return an appropriate token for ipconfig on linux for ipv6" do
-      Facter.stubs(:value).with(:kernel).returns("Linux")
-      Facter::Util::IP.find_token('ipv6', "/sbin/ip addr show").should == 'inet6 '
-    end
+      it "should return an appropriate token for ipconfig on linux for ipv6" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        Facter::Util::IP.find_token('ipaddress', 'ipv6', "/sbin/ip addr show").should == 'inet6 '
+      end
 
-    [:sunos, :"hp-ux"].each do |platform|
-      it "should return an appropriate token for ipconfig on #{platform} for ipv4" do
-        Facter.stubs(:value).with(:kernel).returns(platform)
-        Facter::Util::IP.find_token('ipv4', "/sbin/ifconfig").should == 'inet '
+      [:sunos, :"hp-ux"].each do |platform|
+        it "should return an appropriate token for ipconfig on #{platform} for ipv4" do
+          Facter.stubs(:value).with(:kernel).returns(platform)
+          Facter::Util::IP.find_token('ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet '
+        end
       end
     end
 
     [:freebsd, :netbsd, :openbsd, :darwin, :"gnu/kfreebsd"].each do |platform|
       it "should return an appropriate token for ipconfig on #{platform} for ipv4" do
         Facter.stubs(:value).with(:kernel).returns(platform)
-        Facter::Util::IP.find_token('ipv4', "/sbin/ifconfig").should == 'inet addr: '
+        Facter::Util::IP.find_token('ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet addr: '
       end
     end
 
   end
-
-#  describe "the ipaddress function" do
-#
-#    [:freebsd, :linux, :netbsd, :openbsd, :sunos, :darwin, :"hp-ux", :"gnu/kfreebsd"].each do |platform|
-#      it "should return an appropriate ipaddress on #{platform} for ipv4" do
-#        Facter.stubs(:value).with(:kernel).returns(platform)
-#        Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig').returns(my_fixture_read("ifconfig_#{platform}"))
-#        Facter::Util::IP.ipaddress(nil, 'ipv4').should == ''
-#      end
-#    end
-#
-#  end
 
   describe "on Windows" do
     before :each do
