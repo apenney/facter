@@ -27,15 +27,16 @@ describe Facter::Util::IP do
   end
 
   it "should return a list with a single interface and the loopback interface on Linux with a single interface" do
+    Facter.stubs(:value).with(:kernel).returns(:linux)
     proc = my_fixture_read("linux_proc_with_single_interface")
-    File.stubs(:open).with('/proc/net/dev').returns(proc)
-    Facter::Util::IP.get_interfaces().should =~ ["eth0", "lo"]
+    File.stubs(:read).with('/proc/net/dev').returns(proc)
+    Facter::Util::IP.get_interfaces().should == ["eth0", "lo"]
   end
 
   it "should return a list two interfaces on Darwin with two interfaces" do
     Facter.stubs(:value).with(:kernel).returns(:darwin)
-    darwin_ifconfig = my_fixture_read("darwin_ifconfig_all_with_multiple_interfaces")
-    Facter::Util::IP.stubs(:get_all_interface_output).returns(darwin_ifconfig)
+    interfaces = my_fixture_read("darwin_ifconfig-l")
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig -l').returns interfaces
     Facter::Util::IP.get_interfaces().should == ["lo0", "en0"]
   end
 
@@ -53,11 +54,11 @@ describe Facter::Util::IP do
     Facter::Util::IP.get_interfaces().should == ["lan1", "lan0", "lo0"]
   end
 
-  it "should return a list of six interfaces on a GNU/kFreeBSD with six interfaces" do
+  it "should return a list of six interfaces on a GNU/kFreeBSD with three interfaces" do
     Facter.stubs(:value).with(:kernel).returns(:"gnu/kfreebsd")
-    kfreebsd_ifconfig = my_fixture_read("debian_kfreebsd_ifconfig")
-    Facter::Util::IP.stubs(:get_all_interface_output).returns(kfreebsd_ifconfig)
-    Facter::Util::IP.get_interfaces().should == ["em0", "em1", "bge0", "bge1", "lo0", "vlan0"]
+    interfaces = my_fixture_read("freebsd_ifconfig-l")
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig -l').returns interfaces
+    Facter::Util::IP.get_interfaces().should == ["em0", "plip0", "lo0"]
   end
 
   it "should return a list of only connected interfaces on Windows" do
@@ -169,12 +170,11 @@ describe Facter::Util::IP do
   end
 
   it "should return all interfaces correctly on OS X" do
-    ifconfig_interface = my_fixture_read("Mac_OS_X_10.5.5_ifconfig")
+    Facter.stubs(:value).with(:kernel).returns(:darwin)
+    interfaces = my_fixture_read("osx_ifconfig-l")
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig -l').returns interfaces
 
-    Facter::Util::IP.expects(:get_all_interface_output).returns(ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("Darwin")
-
-    Facter::Util::IP.get_interfaces().should == ["lo0", "gif0", "stf0", "en0", "fw0", "en1", "vmnet8", "vmnet1"]
+    Facter::Util::IP.get_interfaces().should == ["lo0", "gif0", "stf0", "en0", "fw0", "en1", "p2p0"]
   end
 
   it "should return a human readable netmask on Solaris" do

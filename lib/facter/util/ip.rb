@@ -228,14 +228,21 @@ module Facter::Util::IP
   def self.get_interfaces
 
     case Facter.value(:kernel)
-    when 'Linux'
+    when :linux
       interfaces = []
-      File.open('/proc/net/dev').each_line do |line|
+      output = File.read('/proc/net/dev')
+      output.each_line do |line|
         line.match(/\w+\d*:/) do |m|
           interfaces << m.to_s.chomp(':') unless m.nil?
         end
       end
+      puts interfaces
       interfaces.sort!
+    when :freebsd, :netbsd, :openbsd, :dragonfly, :"gnu/kfreebsd", :darwin
+      # Same command is used for ipv4 and ipv6
+      exec = Facter::Util::IP.find_exec('ipaddress', 'ipv4')
+      return [] unless output = Facter::Util::Resolution.exec("#{exec} -l")
+      return output.scan(/\w+/)
     else
       return [] unless output = Facter::Util::IP.get_all_interface_output()
 
