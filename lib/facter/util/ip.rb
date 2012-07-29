@@ -337,10 +337,12 @@ module Facter::Util::IP
     methods = self.find_value(type, subtype)
     methods.each do |name, method|
       # Strip back to just the file
-      file = method[:exec].split(' ').first
-      if FileTest.exists?(file)
-        exec = method[:exec]
-        break
+      if method[:exec]
+        file = method[:exec].split(' ').first
+        if FileTest.exists?(file)
+          exec = method[:exec]
+          break
+        end
       end
     end
     return exec
@@ -348,7 +350,6 @@ module Facter::Util::IP
 
   def self.find_entry(item, type, subtype, exec)
     entry = nil
-
     return entry unless methods = self.find_value(type, subtype)
     methods.each do |name, method|
       if method[:exec] == exec
@@ -365,15 +366,13 @@ module Facter::Util::IP
     token = Facter::Util::IP.find_entry('token', 'ipaddress', subtype, exec)
     regex = Facter::Util::IP.find_entry('regex', 'ipaddress', subtype, exec)
 
-    unless interface.nil?
-      command = "#{exec} #{interface}"
-    end
+    command = "#{exec}"
+    command << " #{interface}" unless interface.nil?
+
     output = Facter::Util::Resolution.exec(command)
-    if output.nil?
-      return []
-    else
-      ipaddress = Facter::Util::IP.get_item_after_token(output, token, regex, ignore)
-    end
+    return [] if output.nil?
+    ipaddress = Facter::Util::IP.get_item_after_token(output, token, regex, ignore)
+
     ipaddress
   end
 
@@ -404,7 +403,7 @@ module Facter::Util::IP
 
   def self.macaddress(interface)
     macaddress = nil
-    case Facter.value(:kernel)
+    case Facter.value(:kernel).downcase.to_sym
     when :linux
       return nil unless output = File.read("/sys/class/net/#{interface}/address")
       macaddress = output
@@ -413,7 +412,7 @@ module Facter::Util::IP
       token = Facter::Util::IP.find_entry('token', 'macaddress', 'ethernet', exec)
       regex = Facter::Util::IP.find_entry('regex', 'macaddress', 'ethernet', exec)
 
-      case Facter.value(:kernel)
+      case Facter.value(:kernel).downcase.to_sym
       when :"hp-ux"
         ppa = interface.slice(-1)
         command = "#{exec} #{ppa}"
@@ -452,10 +451,10 @@ module Facter::Util::IP
   end
 
   def self.get_interfaces
-    case Facter.value(:kernel)
+    interfaces = []
+    case Facter.value(:kernel).downcase.to_sym
     when :linux
       # Linux lacks ifconfig -l so grub around in /proc/ for something to parse.
-      interfaces = []
       output = File.read('/proc/net/dev')
       output.each_line do |line|
         line.match(/\w+\d*:/) do |m|
@@ -467,30 +466,35 @@ module Facter::Util::IP
       # Same command is used for ipv4 and ipv6
       exec = Facter::Util::IP.find_exec('ipaddress', 'ipv4')
       return [] unless output = Facter::Util::Resolution.exec("#{exec} -l")
-      return output.scan(/\w+/)
+      interfaces = output.scan(/\w+/)
     else
       return [] unless output = Facter::Util::IP.get_all_interface_output()
 
       # windows interface names contain spaces and are quoted and can appear multiple
       # times as ipv4 and ipv6
-      return output.scan(/\s* connected\s*(\S.*)/).flatten.uniq if Facter.value(:kernel) == 'windows'
-
-      # Our regex appears to be stupid, in that it leaves colons sitting
-      # at the end of interfaces.  So, we have to trim those trailing
-      # characters.  I tried making the regex better but supporting all
-      # platforms with a single regex is probably a bit too much.
-      output.scan(/^\S+/).collect { |i| i.sub(/:$/, '') }.uniq
+      if Facter.value(:kernel).downcase.to_sym == :windows
+        interfaces = output.scan(/\s* connected\s*(\S.*)/).flatten.uniq
+      else
+        # Our regex appears to be stupid, in that it leaves colons sitting
+        # at the end of interfaces.  So, we have to trim those trailing
+        # characters.  I tried making the regex better but supporting all
+        # platforms with a single regex is probably a bit too much.
+        interfaces = output.scan(/^\S+/).collect { |i| i.sub(/:$/, '') }.uniq
+      end
     end
+    interfaces
   end
 
   def self.get_all_interface_output()
     exec4 = Facter::Util::IP.find_exec('ipaddress', 'ipv4')
     exec6 = Facter::Util::IP.find_exec('ipaddress', 'ipv6')
 
-    case Facter.value(:kernel)
-    when 'HP-UX'
+    case Facter.value(:kernel).downcase.to_sym
+    when :solaris
+      output = Facter::Util::Resolution.exec(exec4)
+    when :"hp-ux"
       output = %x{/bin/netstat -in | sed -e 1d}
-    when 'windows'
+    when :windows
       output = %x|#{exec4}|
       output += %x|#{exec6}|
     end

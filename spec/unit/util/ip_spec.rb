@@ -62,7 +62,7 @@ describe Facter::Util::IP do
   end
 
   it "should return a list of only connected interfaces on Windows" do
-    Facter.fact(:kernel).stubs(:value).returns("windows")
+    Facter.fact(:kernel).stubs(:value).returns(:windows)
     windows_netsh = my_fixture_read("windows_netsh_all_interfaces")
     Facter::Util::IP.stubs(:get_all_interface_output).returns(windows_netsh)
     Facter::Util::IP.get_interfaces().should == ["Loopback Pseudo-Interface 1", "Local Area Connection", "Teredo Tunneling Pseudo-Interface"]
@@ -250,7 +250,7 @@ describe Facter::Util::IP do
       end
 
       it "should return appropriate executables for windows" do
-        Facter.stubs(:value).with(:kernel).returns("Windows")
+        Facter.stubs(:value).with(:kernel).returns(:windows)
         FileTest.stubs(:exists?).with("/system32/netsh.exe").returns(true)
         Facter::Util::IP.find_exec('ipaddress', 'ipv4').should == "/system32/netsh.exe interface ip show interface"
       end
@@ -306,7 +306,7 @@ describe Facter::Util::IP do
 
   describe "on Windows" do
     before :each do
-      Facter.stubs(:value).with(:kernel).returns("windows")
+      Facter.stubs(:value).with(:kernel).returns(:windows)
       FileTest.stubs(:exists?).with("/system32/netsh.exe").returns(true)
     end
 
