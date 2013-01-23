@@ -93,7 +93,7 @@ Facter.add("virtual") do
     end
 
     if result == "physical"
-      output = Facter::Util::Resolution.exec('lspci 2>/dev/null')
+      output = Facter::Util::Virtual.lspci
       if not output.nil?
         output.each_line do |p|
           # --- look for the vmware video card to determine if it is virtual => vmware.
@@ -111,6 +111,9 @@ Facter.add("virtual") do
           # --- look for Hyper-V video card
           # ---   00:08.0 VGA compatible controller: Microsoft Corporation Hyper-V virtual VGA
           result = "hyperv" if p =~ /Microsoft Corporation Hyper-V/
+          # --- look for gmetrics for GCE
+          # --- 00:05.0 Class 8007: Google, Inc. Device 6442
+          result = "gce" if p =~ /Class 8007: Google, Inc/
         end
       else
         output = Facter::Util::Resolution.exec('dmidecode')
@@ -157,6 +160,54 @@ Facter.add("virtual") do
   end
 end
 
+##
+# virtual fact based on virt-what command.
+#
+# The output is mapped onto existing known values for the virtual fact in an
+# effort to preserve consistency.  This fact has a high weight becuase the
+# virt-what tool is expected to be maintained upstream.
+#
+# If the virt-what command is not available, this fact will not resolve to a
+# value and lower-weight virtual facts will be attempted.
+#
+# Only the last line of the virt-what command is returned
+Facter.add("virtual") do
+  has_weight 500
+
+  setcode do
+    output = Facter::Util::Virtual.virt_what
+    case output
+    when 'linux_vserver'
+      Facter::Util::Virtual.vserver_type
+    when /xen-hvm/i
+      'xenhvm'
+    when /xen-dom0/i
+      'xen0'
+    when /xen-domU/i
+      'xenu'
+    when /ibm_systemz/i
+      'zlinux'
+    else
+      output.to_s.split("\n").last
+    end
+  end
+end
+
+##
+# virtual fact specific to Google Compute Engine's Linux sysfs entry.
+Facter.add("virtual") do
+  has_weight 600
+  confine :kernel => "Linux"
+
+  setcode do
+    if dmi_data = Facter::Util::Virtual.read_sysfs_dmi_entries
+      case dmi_data
+      when /Google/
+        "gce"
+      end
+    end
+  end
+end
 # Fact: is_virtual
 #
 # Purpose: returning true or false for if a machine is virtualised or not.

@@ -1,4 +1,4 @@
-#! /usr/bin/env ruby -S rspec
+#! /usr/bin/env ruby
 
 require 'spec_helper'
 require 'facter/util/ip'
@@ -54,11 +54,10 @@ describe Facter::Util::IP do
     Facter::Util::IP.get_interfaces().should == ["lan1", "lan0", "lo0"]
   end
 
-  it "should return a list of six interfaces on a GNU/kFreeBSD with three interfaces" do
-    Facter.stubs(:value).with(:kernel).returns(:"gnu/kfreebsd")
-    interfaces = my_fixture_read("freebsd_ifconfig-l")
-    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig -l').returns interfaces
-    Facter::Util::IP.get_interfaces().should == ["em0", "plip0", "lo0"]
+  it "should return a list of six interfaces on a GNU/kFreeBSD with six interfaces" do
+    kfreebsd_ifconfig = my_fixture_read("debian_kfreebsd_ifconfig")
+    Facter::Util::IP.stubs(:get_all_interface_output).returns(kfreebsd_ifconfig)
+    Facter::Util::IP.get_interfaces().should == ["em0", "em1", "bge0", "bge1", "lo0", "vlan0"]
   end
 
   it "should return a list of only connected interfaces on Windows" do
@@ -96,26 +95,6 @@ describe Facter::Util::IP do
     it "should return calculated network information for a single interface" do
       Facter::Util::IP.get_network_value("e1000g0").should == "172.16.15.0"
     end
-  end
-
-  it "should return ipaddress information for HP-UX" do
-    hpux_ifconfig_interface = my_fixture_read("hpux_ifconfig_single_interface")
-
-    FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(true)
-    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig lan0').returns(hpux_ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns(:"hp-ux")
-
-    Facter::Util::IP.ipaddress('lan0', 'ipv4').should == "168.24.80.71"
-  end
-
-  it "should return macaddress information for HP-UX" do
-    hpux_lanscan_output = my_fixture_read("hpux_lanscan_single_output")
-
-    FileTest.stubs(:exists?).with("/sbin/lanscan").returns(true)
-    Facter::Util::Resolution.stubs(:exec).with('/sbin/lanscan -a 0').returns(hpux_lanscan_output)
-    Facter.stubs(:value).with(:kernel).returns(:"hp-ux")
-
-    Facter::Util::IP.macaddress("lan0").should == "00306e3899af"
   end
 
   it "should return macaddress with leading zeros stripped off for GNU/kFreeBSD" do
@@ -180,15 +159,6 @@ describe Facter::Util::IP do
     Facter::Util::IP.netmask("e1000g0").should == "255.255.255.0"
   end
 
-  it "should return a human readable netmask on HP-UX" do
-    hpux_ifconfig_interface = my_fixture_read("hpux_ifconfig_single_interface")
-
-    Facter.stubs(:value).with(:kernel).returns(:"hp-ux")
-    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig lan0').returns(hpux_ifconfig_interface)
-
-    Facter::Util::IP.netmask("lan0").should == "255.255.255.0"
-  end
-
   it "should return a human readable netmask on Darwin" do
     darwin_ifconfig_interface = my_fixture_read("darwin_ifconfig_single_interface")
 
@@ -205,6 +175,37 @@ describe Facter::Util::IP do
     Facter.stubs(:value).with(:kernel).returns(:"gnu/kfreebsd")
 
     Facter::Util::IP.netmask("em1").should == "255.255.255.0"
+  end
+
+  it "should return correct macaddress information for infiniband on Linux" do
+    correct_ifconfig_interface = my_fixture_read("linux_get_single_interface_ib0")
+
+    Facter::Util::IP.expects(:get_single_interface_output).with("ib0").returns(correct_ifconfig_interface)
+    Facter.stubs(:value).with(:kernel).returns("Linux")
+
+    Facter::Util::IP.get_interface_value("ib0", "macaddress").should == "80:00:00:4a:fe:80:00:00:00:00:00:00:00:02:c9:03:00:43:27:21"
+  end
+
+  it "should replace the incorrect macaddress with the correct macaddress in ifconfig for infiniband on Linux" do
+    ifconfig_interface = my_fixture_read("linux_ifconfig_ib0")
+    correct_ifconfig_interface = my_fixture_read("linux_get_single_interface_ib0")
+
+    Facter::Util::IP.expects(:get_infiniband_macaddress).with("ib0").returns("80:00:00:4a:fe:80:00:00:00:00:00:00:00:02:c9:03:00:43:27:21")
+    Facter::Util::IP.expects(:ifconfig_interface).with("ib0").returns(ifconfig_interface)
+    Facter.stubs(:value).with(:kernel).returns("Linux")
+
+    Facter::Util::IP.get_single_interface_output("ib0").should == correct_ifconfig_interface
+  end
+
+  it "should return fake macaddress information for infiniband on Linux when neither sysfs or /sbin/ip are available" do
+    ifconfig_interface = my_fixture_read("linux_ifconfig_ib0")
+
+    File.expects(:exists?).with("/sys/class/net/ib0/address").returns(false)
+    File.expects(:exists?).with("/sbin/ip").returns(false)
+    Facter::Util::IP.expects(:ifconfig_interface).with("ib0").returns(ifconfig_interface)
+    Facter.stubs(:value).with(:kernel).returns("Linux")
+
+    Facter::Util::IP.get_interface_value("ib0", "macaddress").should == "FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF"
   end
 
   it "should not get bonding master on interface aliases" do
@@ -302,6 +303,164 @@ describe Facter::Util::IP do
       end
     end
 
+  it "should return mtu information on Linux" do
+    linux_ifconfig = my_fixture_read("linux_ifconfig_all_with_single_interface")
+    Facter::Util::IP.stubs(:get_all_interface_output).returns(linux_ifconfig)
+    Facter::Util::IP.stubs(:get_single_interface_output).with("eth0").
+      returns(my_fixture_read("linux_get_single_interface_eth0"))
+    Facter::Util::IP.stubs(:get_single_interface_output).with("lo").
+      returns(my_fixture_read("linux_get_single_interface_lo"))
+    Facter.stubs(:value).with(:kernel).returns("Linux")
+
+    Facter::Util::IP.get_interface_value("eth0", "mtu").should == "1500"
+    Facter::Util::IP.get_interface_value("lo", "mtu").should == "16436"
+  end
+
+  it "should return mtu information on Darwin" do
+    darwin_ifconfig_interface = my_fixture_read("darwin_ifconfig_single_interface")
+
+    Facter::Util::IP.expects(:get_single_interface_output).with("en1").returns(darwin_ifconfig_interface)
+    Facter.stubs(:value).with(:kernel).returns("Darwin")
+
+    Facter::Util::IP.get_interface_value("en1", "mtu").should == "1500"
+  end
+
+  it "should return mtu information for Solaris" do
+    solaris_ifconfig_interface = my_fixture_read("solaris_ifconfig_single_interface")
+
+    Facter::Util::IP.expects(:get_single_interface_output).with("e1000g0").returns(solaris_ifconfig_interface)
+    Facter.stubs(:value).with(:kernel).returns("SunOS")
+
+    Facter::Util::IP.get_interface_value("e1000g0", "mtu").should == "1500"
+  end
+
+  # (#17487) - tests for HP-UX.
+  # some fake data for testing robustness of regexps.
+  def self.fake_netstat_in_examples
+    examples = []
+    examples << ["Header row\na line with none in it\na line without\nanother line without\n",
+                 "a line without\nanother line without\n"]
+    examples << ["Header row\na line without\na line with none in it\nanother line with none\nanother line without\n",
+                 "a line without\nanother line without\n"]
+    examples << ["Header row\na line with * asterisks *\na line with none in it\nanother line without\n",
+                 "a line with  asterisks \nanother line without\n"]
+    examples << ["a line with none none none in it\na line with none in it\na line without\nanother line without\n",
+                 "another line without\n"]
+    examples
+  end
+
+  fake_netstat_in_examples.each_with_index do |example, i|
+    input, expected_output = example
+    it "should pass regexp test on fake netstat input example #{i}" do
+      Facter.stubs(:value).with(:kernel).returns("HP-UX")
+      Facter::Util::IP.stubs(:hpux_netstat_in).returns(input)
+      Facter::Util::IP.get_all_interface_output().should == expected_output
+    end
+  end
+
+  # and some real data for exhaustive tests.
+  def self.hpux_examples
+    examples = []
+    examples << ["HP-UX 11.11",
+                   ["lan1",              "lan0",              "lo0"      ],
+                   ["1500",              "1500",              "4136"     ],
+                   ["10.1.1.6",          "192.168.3.10",      "127.0.0.1"],
+                   ["255.255.255.0",     "255.255.255.0",     "255.0.0.0"],
+                   ["00:10:79:7B:5C:DE", "00:30:7F:0C:79:DC", nil        ],
+                   [my_fixture_read("hpux_1111_ifconfig_lan1"),
+                      my_fixture_read("hpux_1111_ifconfig_lan0"),
+                        my_fixture_read("hpux_1111_ifconfig_lo0")],
+                           my_fixture_read("hpux_1111_netstat_in"),
+                           my_fixture_read("hpux_1111_lanscan")]
+
+    examples << ["HP-UX 11.31",
+                   ["lan1",              "lan0",              "lo0"      ],
+                   ["1500",              "1500",              "4136"     ],
+                   ["10.1.54.36",        "192.168.30.152",    "127.0.0.1"],
+                   ["255.255.255.0",     "255.255.255.0",     "255.0.0.0"],
+                   ["00:17:FD:2D:2A:57", "00:12:31:7D:62:09", nil        ],
+                   [my_fixture_read("hpux_1131_ifconfig_lan1"),
+                      my_fixture_read("hpux_1131_ifconfig_lan0"),
+                        my_fixture_read("hpux_1131_ifconfig_lo0")],
+                           my_fixture_read("hpux_1131_netstat_in"),
+                           my_fixture_read("hpux_1131_lanscan")]
+
+    examples << ["HP-UX 11.31 with an asterisk after a NIC that has an address",
+                   ["lan1",              "lan0",              "lo0"      ],
+                   ["1500",              "1500",              "4136"     ],
+                   ["10.10.0.5",         "192.168.3.9",       "127.0.0.1"],
+                   ["255.255.255.0",     "255.255.255.0",     "255.0.0.0"],
+                   ["00:10:79:7B:BE:46", "00:30:5D:06:26:B2", nil        ],
+                   [my_fixture_read("hpux_1131_asterisk_ifconfig_lan1"),
+                      my_fixture_read("hpux_1131_asterisk_ifconfig_lan0"),
+                        my_fixture_read("hpux_1131_asterisk_ifconfig_lo0")],
+                           my_fixture_read("hpux_1131_asterisk_netstat_in"),
+                           my_fixture_read("hpux_1131_asterisk_lanscan")]
+
+    examples << ["HP-UX 11.31 with NIC bonding and one virtual NIC",
+                   ["lan4:1",        "lan1",              "lo0",       "lan4"             ],
+                   ["1500",          "1500",              "4136",      "1500"             ],
+                   ["192.168.1.197", "192.168.30.32",     "127.0.0.1", "192.168.32.75"    ],
+                   ["255.255.255.0", "255.255.255.0",     "255.0.0.0", "255.255.255.0"    ],
+                   [nil,             "00:12:81:9E:48:DE", nil,         "00:12:81:9E:4A:7E"],
+                   [my_fixture_read("hpux_1131_nic_bonding_ifconfig_lan4_1"),
+                      my_fixture_read("hpux_1131_nic_bonding_ifconfig_lan1"),
+                        my_fixture_read("hpux_1131_nic_bonding_ifconfig_lo0"),
+                          my_fixture_read("hpux_1131_nic_bonding_ifconfig_lan4")],
+                           my_fixture_read("hpux_1131_nic_bonding_netstat_in"),
+                           my_fixture_read("hpux_1131_nic_bonding_lanscan")]
+    examples
+  end
+
+  hpux_examples.each do |example|
+    description, array_of_expected_ifs, array_of_expected_mtus,
+      array_of_expected_ips, array_of_expected_netmasks,
+        array_of_expected_macs, array_of_ifconfig_fixtures,
+           netstat_in_fixture, lanscan_fixture = example
+
+    it "should return a list three interfaces on #{description}" do
+      Facter.stubs(:value).with(:kernel).returns("HP-UX")
+      Facter::Util::IP.stubs(:hpux_netstat_in).returns(netstat_in_fixture)
+      Facter::Util::IP.get_interfaces().should == array_of_expected_ifs
+    end
+
+    array_of_expected_ifs.each_with_index do |nic, i|
+      ifconfig_fixture = array_of_ifconfig_fixtures[i]
+      expected_mtu = array_of_expected_mtus[i]
+      expected_ip = array_of_expected_ips[i]
+      expected_netmask = array_of_expected_netmasks[i]
+      expected_mac = array_of_expected_macs[i]
+
+      # (#17808) These tests fail because MTU facts haven't been implemented for HP-UX.
+      #it "should return MTU #{expected_mtu} on #{nic} for #{description} example" do
+      #  Facter.stubs(:value).with(:kernel).returns("HP-UX")
+      #  Facter::Util::IP.stubs(:hpux_netstat_in).returns(netstat_in_fixture)
+      #  Facter::Util::IP.stubs(:hpux_lanscan).returns(lanscan_fixture)
+      #  Facter::Util::IP.stubs(:hpux_ifconfig_interface).with(nic).returns(ifconfig_fixture)
+      #  Facter::Util::IP.get_interface_value(nic, "mtu").should == expected_mtu
+      #end
+
+      it "should return IP #{expected_ip} on #{nic} for #{description} example" do
+        Facter.stubs(:value).with(:kernel).returns("HP-UX")
+        Facter::Util::IP.stubs(:hpux_lanscan).returns(lanscan_fixture)
+        Facter::Util::IP.stubs(:hpux_ifconfig_interface).with(nic).returns(ifconfig_fixture)
+        Facter::Util::IP.get_interface_value(nic, "ipaddress").should == expected_ip
+      end
+
+      it "should return netmask #{expected_netmask} on #{nic} for #{description} example" do
+        Facter.stubs(:value).with(:kernel).returns("HP-UX")
+        Facter::Util::IP.stubs(:hpux_lanscan).returns(lanscan_fixture)
+        Facter::Util::IP.stubs(:hpux_ifconfig_interface).with(nic).returns(ifconfig_fixture)
+        Facter::Util::IP.get_interface_value(nic, "netmask").should == expected_netmask
+      end
+
+      it "should return MAC address #{expected_mac} on #{nic} for #{description} example" do
+        Facter.stubs(:value).with(:kernel).returns("HP-UX")
+        Facter::Util::IP.stubs(:hpux_lanscan).returns(lanscan_fixture)
+        Facter::Util::IP.stubs(:hpux_ifconfig_interface).with(nic).returns(ifconfig_fixture)
+        Facter::Util::IP.get_interface_value(nic, "macaddress").should == expected_mac
+      end
+    end
   end
 
   describe "on Windows" do
@@ -341,5 +500,28 @@ describe Facter::Util::IP do
 
     end
 
+  end
+
+  context "with bonded ethernet interfaces on Linux" do
+    before :each do
+      Facter.fact(:kernel).stubs(:value).returns("Linux")
+    end
+
+    describe "Facter::Util::Ip.get_interface_value" do
+      before :each do
+        Facter::Util::IP.stubs(:read_proc_net_bonding).
+          with("/proc/net/bonding/bond0").
+          returns(my_fixture_read("linux_2_6_35_proc_net_bonding_bond0"))
+
+        Facter::Util::IP.stubs(:get_bonding_master).returns("bond0")
+      end
+
+      it 'provides the real device macaddress for eth0' do
+        Facter::Util::IP.get_interface_value("eth0", "macaddress").should == "00:11:22:33:44:55"
+      end
+      it 'provides the real device macaddress for eth1' do
+        Facter::Util::IP.get_interface_value("eth1", "macaddress").should == "00:11:22:33:44:56"
+      end
+    end
   end
 end

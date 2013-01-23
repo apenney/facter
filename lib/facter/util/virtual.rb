@@ -1,4 +1,19 @@
 module Facter::Util::Virtual
+  ##
+  # virt_what is a delegating helper method intended to make it easier to stub
+  # the system call without affecting other calls to
+  # Facter::Util::Resolution.exec
+  def self.virt_what(command = "virt-what")
+    Facter::Util::Resolution.exec command
+  end
+
+  ##
+  # lspci is a delegating helper method intended to make it easier to stub the
+  # system call without affecting other calls to Facter::Util::Resolution.exec
+  def self.lspci(command = "lspci 2>/dev/null")
+    Facter::Util::Resolution.exec command
+  end
+
   def self.openvz?
     FileTest.directory?("/proc/vz") and not self.openvz_cloudlinux?
   end
@@ -31,7 +46,7 @@ module Facter::Util::Virtual
 
   def self.vserver?
     return false unless FileTest.exists?("/proc/self/status")
-    txt = File.read("/proc/self/status")
+    txt = File.open("/proc/self/status", "rb").read
     return true if txt =~ /^(s_context|VxID):[[:blank:]]*[0-9]/
     return false
   end
@@ -84,7 +99,22 @@ module Facter::Util::Virtual
     Facter::Util::Resolution.exec("/usr/bin/getconf MACHINE_MODEL").chomp =~ /Virtual Machine/
   end
 
-   def self.zlinux?
+  def self.zlinux?
     "zlinux"
-   end
+  end
+
+  ##
+  # read_sysfs Reads the raw data as per the documentation at [Detecting if You
+  # Are Running in Google Compute
+  # Engine](https://developers.google.com/compute/docs/instances#dmi)  This
+  # method is intended to provide an easy seam to mock.
+  #
+  # @api public
+  #
+  # @return [String] or nil if the path does not exist
+  def self.read_sysfs_dmi_entries(path="/sys/firmware/dmi/entries/1-0/raw")
+    if File.exists?(path)
+      File.read(path)
+    end
+  end
 end

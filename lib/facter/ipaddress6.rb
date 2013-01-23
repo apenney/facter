@@ -26,7 +26,13 @@ Facter.add(:ipaddress6) do
   has_weight 100
   confine :kernel => %w{Linux FreeBSD OpenBSD Darwin DragonFly HP-UX GNU/kFreeBSD AIX windows}
   setcode do
+<<<<<<< HEAD
     Facter::Util::IP.ipaddress(nil, 'ipv6')
+=======
+    output = Facter::Util::Resolution.exec('/sbin/ifconfig 2>/dev/null')
+
+    get_address_after_token(output, 'inet6 addr:')
+>>>>>>> master
   end
 end
 

@@ -16,7 +16,7 @@ Facter.add(:osfamily) do
 
   setcode do
     case Facter.value(:operatingsystem)
-    when "RedHat", "Fedora", "CentOS", "Scientific", "SLC", "Ascendos", "CloudLinux", "PSBM", "OracleLinux", "OVS", "OEL", "Amazon"
+    when "RedHat", "Fedora", "CentOS", "Scientific", "SLC", "Ascendos", "CloudLinux", "PSBM", "OracleLinux", "OVS", "OEL", "Amazon", "XenServer"
       "RedHat"
     when "Ubuntu", "Debian"
       "Debian"
@@ -24,6 +24,12 @@ Facter.add(:osfamily) do
       "Suse"
     when "Solaris", "Nexenta", "OmniOS", "OpenIndiana", "SmartOS"
       "Solaris"
+    when "Gentoo"
+      "Gentoo"
+    when "Archlinux"
+      "Archlinux"
+    when "Mandrake", "Mandriva"
+      "Mandrake"
     else
       Facter.value("kernel")
     end
