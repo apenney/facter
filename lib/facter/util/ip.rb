@@ -2,30 +2,6 @@
 # information from all kinds of platforms.
 module Facter::Util::IP
 
-  # A map of all the different regexes that work for
-  # a given platform or set of platforms.
-  REGEX_MAP = {
-    :linux => {
-      :netmask  => /Mask:([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/,
-      :mtu  => /MTU:(\d+)/
-    },
-    :bsd   => {
-      :aliases  => [:openbsd, :netbsd, :freebsd, :darwin, :"gnu/kfreebsd", :dragonfly],
-      :netmask  => /netmask\s+0x(\w{8})/,
-      :mtu => /mtu\s+(\d+)/
-    },
-    :sunos => {
-      :netmask  => /netmask\s+(\w{8})/,
-      :mtu => /mtu\s+(\d+)/
-    },
-    :"hp-ux" => {
-      :netmask  => /.*\s+netmask (\S+)\s.*/
-    },
-    :windows => {
-      :netmask  => /\s+Subnet Prefix:\s+\S+\s+\(mask ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\)/
-    }
-  }
-
   # Interface map to centralize all the functionality needed to parse elements out of the
   # operating systems native tools to display interface information.
   INTERFACE_MAP = {
@@ -102,12 +78,12 @@ module Facter::Util::IP
             :ip => {
               :exec => '/sbin/ip addr show',
               :regex => '(\d+)',
-              :token => 'MTU:',
+              :token => 'mtu ',
             },
             :ifconfig => {
-              :exec => '/sbin/ip addr show',
+              :exec => '/sbin/ifconfig',
               :regex => '(\d+)',
-              :token => 'mtu ',
+              :token => 'MTU:',
             },
           },
         },
@@ -157,8 +133,15 @@ module Facter::Util::IP
             },
           },
         },
+        :mtu => {
+            :ifconfig => {
+              :exec => '/sbin/ifconfig',
+              :regex => '(\d+)',
+              :token => 'MTU:',
+            },
+          },
+        },
       },
-    },
     :sunos => {
       :methods => {
         :ipaddress => {
@@ -202,8 +185,16 @@ module Facter::Util::IP
             },
           },
         },
+        :mtu => {
+          :ipv4 => {
+            :ifconfig => {
+              :exec => '/sbin/ifconfig',
+              :regex => '(\d+)',
+              :token => 'MTU:',
+            },
+          },
+        },
       },
-    },
     :"hp-ux" => {
       :methods => {
         :ipaddress => {
@@ -244,6 +235,15 @@ module Facter::Util::IP
               :regex => '(?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4}\/(\d+)',
               :exec   => '/sbin/ifconfig',
               :token  => 'inet6 ',
+            },
+          },
+        },
+        :mtu => {
+          :ipv4 => {
+            :ifconfig => {
+              :exec => '/sbin/ifconfig',
+              :regex => '(\d+)',
+              :token => 'MTU:',
             },
           },
         },
@@ -292,6 +292,15 @@ module Facter::Util::IP
             },
           },
         },
+        :mtu => {
+          :ipv4 => {
+            :ifconfig => {
+              :exec => '/sbin/ifconfig',
+              :regex => '(\d+)',
+              :token => 'MTU:',
+            },
+          },
+        },
       },
     },
     :windows => {
@@ -330,13 +339,13 @@ module Facter::Util::IP
         },
       },
     },
-  }
+  },
+}
 
   # Help find specific values in the INTERFACE_MAP nested hash to reduce boilerplate.
   def self.find_value(type, subtype)
     kernel = Facter.value(:kernel).downcase.to_sym
-    unless map = INTERFACE_MAP[kernel] || INTERFACE_MAP.values.find { |tmp| 
-      tmp[:aliases] and tmp[:aliases].include?(kernel) }
+    unless map = INTERFACE_MAP[kernel] || INTERFACE_MAP.values.find { |tmp| tmp[:aliases] and tmp[:aliases].include?(kernel) }
       return []
     end
     return map[:methods][type.to_sym][subtype.to_sym]
@@ -382,9 +391,15 @@ module Facter::Util::IP
     entry
   end
 
-  # Return the ipaddress of an interface.
+  # Return an attribute from an interface.
   def self.get_attribute(interface=nil, attribute='ipaddress', subtype='ipv4', ignore=/^127\./)
     attr  = nil
+
+    # Unless this is a supported OS, return a blank array.
+    kernel = Facter.value(:kernel).downcase.to_sym
+    unless INTERFACE_MAP[kernel] || INTERFACE_MAP.values.find { |tmp| tmp[:aliases] and tmp[:aliases].include?(kernel) }
+      return []
+    end
 
     exec  = Facter::Util::IP.find_exec(attribute, subtype)
     token = Facter::Util::IP.find_entry('token', attribute, subtype, exec)
@@ -584,33 +599,27 @@ module Facter::Util::IP
   # @api private
   #
   # @return [String] representing the requested value.  An empty array is
-  # returned if the kernel is not supported by the REGEX_MAP constant.
+  # returned if the kernel is not supported by the INTERFACE_MAP constant.
   def self.get_interface_value(interface, label)
-    tmp1 = []
     case label
-    when 'ipaddress'
-      return Facter::Util::IP::get_attribute(interface, label)
-    when 'ipaddress6'
+    when 'ipaddress', 'ipaddress6', 'netmask', 'mtu'
       return Facter::Util::IP::get_attribute(interface, label)
     when 'macaddress'
       bonddev = get_bonding_master(interface)
       if bonddev
         return Facter::Util::IP::get_bonding(interface)
       else
-        return Facter::Util::IP::get_attribute(interface, label)
+        return Facter::Util::IP::get_attribute(interface, label, subtype='ethernet')
       end
-    when 'netmask'
-      return Facter::Util::IP::get_attribute(interface, label)
-    when 'mtu'
-      return Facter::Util::IP::get_attribute(interface, label)
     end
   end
 
   def get_bonding(interface)
+    tmp1 = []
     kernel = Facter.value(:kernel).downcase.to_sym
 
     # If it's not directly in the map or aliased in the map, then we don't know how to deal with it.
-    unless map = REGEX_MAP[kernel] || REGEX_MAP.values.find { |tmp| tmp[:aliases] and tmp[:aliases].include?(kernel) }
+    unless map = INTERFACE_MAP[kernel] || INTERFACE_MAP.values.find { |tmp| tmp[:aliases] and tmp[:aliases].include?(kernel) }
       return []
     end
 
@@ -670,6 +679,18 @@ module Facter::Util::IP
       subnet = IPAddr.new(netmask, Socket::AF_INET)
       network = ip.mask(subnet.to_s).to_s
     end
+  end
+
+  def self.cidr_to_netmask(cidr)
+    require 'ipaddr'
+    IPAddr.new('255.255.255.255').mask(cidr).to_s
+  end
+
+  def self.hex_to_netmask(hex)
+    require 'scanf'
+    # Yank out the 0x
+    stripped = hex.gsub(/^0x/, '')
+    stripped.scanf('%2x'*4)*"."
   end
 
 end

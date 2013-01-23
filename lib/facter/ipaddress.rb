@@ -26,7 +26,7 @@ Facter.add(:ipaddress) do
   has_weight 100
   confine :kernel => %w{Linux FreeBSD OpenBSD Darwin DragonFly HP-UX GNU/kFreeBSD AIX windows}
   setcode do
-    Facter::Util::IP.get_attribute(nil, attribute='ipaddress')
+    Facter::Util::IP.get_attribute(nil, attribute='ipaddress', subtype='ipv4')
   end
 end
 
@@ -34,7 +34,7 @@ Facter.add(:ipaddress) do
   has_weight 100
   confine :kernel => %w{NetBSD SunOS}
   setcode do
-    Facter::Util::IP.get_attribute(nil, attribute='ipaddress', ignore=/^127\.|^0\.0\.0\.0/)
+    Facter::Util::IP.get_attribute(nil, attribute='ipaddress', subtype='ipv4', ignore=/^127\.|^0\.0\.0\.0/)
   end
 end
 

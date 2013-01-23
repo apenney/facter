@@ -77,38 +77,66 @@ describe Facter::Util::IP do
     Facter::Util::IP.get_interface_value("e1000g0", "netmask").should == []
   end
 
-  it "should return ipaddress information for Solaris" do
-    solaris_ifconfig_interface = my_fixture_read("solaris_ifconfig_single_interface")
+  # Solaris Facts
+  describe "on solaris" do
+    before :each do
+      Facter.stubs(:value).with(:kernel).returns(:sunos)
+      solaris_ifconfig_interface = my_fixture_read("solaris_ifconfig_single_interface")
+      Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig e1000g0').returns(solaris_ifconfig_interface)
+    end
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("e1000g0").returns(solaris_ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("SunOS")
+    it "should return ipaddress information for a single interface" do
+      Facter::Util::IP.get_attribute("e1000g0", "ipaddress", "ipv4").should == "172.16.15.138"
+    end
 
-    Facter::Util::IP.get_interface_value("e1000g0", "ipaddress").should == "172.16.15.138"
+    it "should return netmask information for a single interface" do
+      Facter::Util::IP.get_attribute("e1000g0", "netmask").should == "255.255.255.0"
+    end
+
+    it "should return calculated network information for a single interface" do
+      Facter::Util::IP.get_network_value("e1000g0").should == "172.16.15.0"
+    end
+
+    it "should return mtu information for Solaris" do
+      solaris_ifconfig_interface = my_fixture_read("solaris_ifconfig_single_interface")
+
+      Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig e1000g0').returns(solaris_ifconfig_interface)
+
+      Facter::Util::IP.get_attribute("e1000g0", "mtu").should == "1500"
+    end
   end
 
-  it "should return netmask information for Solaris" do
-    solaris_ifconfig_interface = my_fixture_read("solaris_ifconfig_single_interface")
+  # HP-UX Facts
+  describe "on HP-UX" do
+    before :each do
+      Facter.stubs(:value).with(:kernel).returns(:"hp-ux")
+    end
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("e1000g0").returns(solaris_ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("SunOS")
+    it "should return ipaddress information for HP-UX" do
+      hpux_ifconfig_interface = my_fixture_read("hpux_ifconfig_single_interface")
 
-    Facter::Util::IP.get_interface_value("e1000g0", "netmask").should == "255.255.255.0"
+      FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(true)
+      Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig lan0').returns(hpux_ifconfig_interface)
+
+      Facter::Util::IP.ipaddress('lan0', 'ipv4').should == "168.24.80.71"
+    end
+
+    it "should return macaddress information for HP-UX" do
+      hpux_lanscan_output = my_fixture_read("hpux_lanscan_single_output")
+
+      FileTest.stubs(:exists?).with("/sbin/lanscan").returns(true)
+      Facter::Util::Resolution.stubs(:exec).with('/sbin/lanscan -a 0').returns(hpux_lanscan_output)
+
+      Facter::Util::IP.macaddress("lan0").should == "00306e3899af"
+    end
   end
 
-  it "should return calculated network information for Solaris" do
-    solaris_ifconfig_interface = my_fixture_read("solaris_ifconfig_single_interface")
-
-    Facter::Util::IP.stubs(:get_single_interface_output).with("e1000g0").returns(solaris_ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("SunOS")
-
-    Facter::Util::IP.get_network_value("e1000g0").should == "172.16.15.0"
-  end
-
+  # FreeBSD Like Facts
   it "should return macaddress with leading zeros stripped off for GNU/kFreeBSD" do
     kfreebsd_ifconfig = my_fixture_read("debian_kfreebsd_ifconfig")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("em0").returns(kfreebsd_ifconfig)
-    Facter.stubs(:value).with(:kernel).returns("GNU/kFreeBSD")
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig em0').returns(kfreebsd_ifconfig)
+    Facter.stubs(:value).with(:kernel).returns(:"gnu/kfreebsd")
 
     Facter::Util::IP.get_interface_value("em0", "macaddress").should == "0:11:a:59:67:90"
   end
@@ -116,46 +144,10 @@ describe Facter::Util::IP do
   it "should return interface information for FreeBSD supported via an alias" do
     ifconfig_interface = my_fixture_read("6.0-STABLE_FreeBSD_ifconfig")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("fxp0").returns(ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("FreeBSD")
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig fxp0').returns(ifconfig_interface)
+    Facter.stubs(:value).with(:kernel).returns(:freebsd)
 
     Facter::Util::IP.get_interface_value("fxp0", "macaddress").should == "00:0e:0c:68:67:7c"
-  end
-
-  it "should return macaddress information for OS X" do
-    ifconfig_interface = my_fixture_read("Mac_OS_X_10.5.5_ifconfig")
-
-    Facter::Util::IP.expects(:get_single_interface_output).with("en1").returns(ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("Darwin")
-
-    Facter::Util::IP.get_interface_value("en1", "macaddress").should == "00:1b:63:ae:02:66"
-  end
-
-  it "should return all interfaces correctly on OS X" do
-    ifconfig_interface = my_fixture_read("Mac_OS_X_10.5.5_ifconfig")
-
-    Facter::Util::IP.expects(:get_all_interface_output).returns(ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("Darwin")
-
-    Facter::Util::IP.get_interfaces().should == ["lo0", "gif0", "stf0", "en0", "fw0", "en1", "vmnet8", "vmnet1"]
-  end
-
-  it "should return a human readable netmask on Solaris" do
-    solaris_ifconfig_interface = my_fixture_read("solaris_ifconfig_single_interface")
-
-    Facter::Util::IP.expects(:get_single_interface_output).with("e1000g0").returns(solaris_ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("SunOS")
-
-    Facter::Util::IP.get_interface_value("e1000g0", "netmask").should == "255.255.255.0"
-  end
-
-  it "should return a human readable netmask on Darwin" do
-    darwin_ifconfig_interface = my_fixture_read("darwin_ifconfig_single_interface")
-
-    Facter::Util::IP.expects(:get_single_interface_output).with("en1").returns(darwin_ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("Darwin")
-
-    Facter::Util::IP.get_interface_value("en1", "netmask").should == "255.255.255.0"
   end
 
   it "should return a human readable netmask on GNU/kFreeBSD" do
@@ -166,11 +158,41 @@ describe Facter::Util::IP do
 
     Facter::Util::IP.get_interface_value("em1", "netmask").should == "255.255.255.0"
   end
+  
+  # OSX Facts
+  describe "on OSX" do
+    before :each do
+      Facter.stubs(:value).with(:kernel).returns(:darwin)
+    end
 
+    it "should return macaddress information for OS X" do
+      ifconfig_interface = my_fixture_read("osx_single_interface")
+
+      Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig en1').returns(ifconfig_interface)
+      Facter::Util::IP.get_interface_value("en1", "macaddress").should == "00:1b:63:ae:02:66"
+    end
+
+    it "should return all interfaces correctly on OS X" do
+      ifconfig_interface = my_fixture_read("Mac_OS_X_10.5.5_ifconfig")
+
+      Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig en1').returns(ifconfig_interface)
+      Facter::Util::IP.get_interfaces().should == ["lo0", "gif0", "stf0", "en0", "fw0", "en1", "vmnet8", "vmnet1"]
+    end
+
+
+    it "should return a human readable netmask on Darwin" do
+      darwin_ifconfig_interface = my_fixture_read("darwin_ifconfig_single_interface")
+
+      Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig en1').returns(darwin_ifconfig_interface)
+      Facter::Util::IP.get_interface_value("en1", "netmask").should == "255.255.255.0"
+    end
+  end
+
+  # Infiniband facts
   it "should return correct macaddress information for infiniband on Linux" do
     correct_ifconfig_interface = my_fixture_read("linux_get_single_interface_ib0")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("ib0").returns(correct_ifconfig_interface)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig ib0').returns(correct_ifconfig_interface)
     Facter.stubs(:value).with(:kernel).returns("Linux")
 
     Facter::Util::IP.get_interface_value("ib0", "macaddress").should == "80:00:00:4a:fe:80:00:00:00:00:00:00:00:02:c9:03:00:43:27:21"
@@ -181,7 +203,7 @@ describe Facter::Util::IP do
     correct_ifconfig_interface = my_fixture_read("linux_get_single_interface_ib0")
 
     Facter::Util::IP.expects(:get_infiniband_macaddress).with("ib0").returns("80:00:00:4a:fe:80:00:00:00:00:00:00:00:02:c9:03:00:43:27:21")
-    Facter::Util::IP.expects(:ifconfig_interface).with("ib0").returns(ifconfig_interface)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig ib0').returns(ifconfig_interface)
     Facter.stubs(:value).with(:kernel).returns("Linux")
 
     Facter::Util::IP.get_single_interface_output("ib0").should == correct_ifconfig_interface
@@ -192,7 +214,7 @@ describe Facter::Util::IP do
 
     File.expects(:exists?).with("/sys/class/net/ib0/address").returns(false)
     File.expects(:exists?).with("/sbin/ip").returns(false)
-    Facter::Util::IP.expects(:ifconfig_interface).with("ib0").returns(ifconfig_interface)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig ib0').returns(ifconfig_interface)
     Facter.stubs(:value).with(:kernel).returns("Linux")
 
     Facter::Util::IP.get_interface_value("ib0", "macaddress").should == "FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF:FF"
@@ -245,14 +267,6 @@ describe Facter::Util::IP do
     Facter::Util::IP.get_interface_value("en1", "mtu").should == "1500"
   end
 
-  it "should return mtu information for Solaris" do
-    solaris_ifconfig_interface = my_fixture_read("solaris_ifconfig_single_interface")
-
-    Facter::Util::IP.expects(:get_single_interface_output).with("e1000g0").returns(solaris_ifconfig_interface)
-    Facter.stubs(:value).with(:kernel).returns("SunOS")
-
-    Facter::Util::IP.get_interface_value("e1000g0", "mtu").should == "1500"
-  end
 
   # (#17487) - tests for HP-UX.
   # some fake data for testing robustness of regexps.
@@ -441,6 +455,77 @@ describe Facter::Util::IP do
       end
       it 'provides the real device macaddress for eth1' do
         Facter::Util::IP.get_interface_value("eth1", "macaddress").should == "00:11:22:33:44:56"
+      end
+    end
+  end
+
+ describe "the find_execs function" do
+
+    describe "for ipaddress" do
+      it "should return appropriate executables for /sbin/ifconfig on linux" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(true)
+        FileTest.stubs(:exists?).with("/sbin/ip").returns(false)
+        Facter::Util::IP.find_exec('ipaddress', 'ipv4').should == "/sbin/ifconfig"
+      end
+
+      it "should return appropriate executables for /sbin/ip on linux" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        FileTest.stubs(:exists?).with("/sbin/ifconfig").returns(false)
+        FileTest.stubs(:exists?).with("/sbin/ip").returns(true)
+        Facter::Util::IP.find_exec('ipaddress', 'ipv4').should == "/sbin/ip addr show"
+      end
+
+      it "should return appropriate executables for windows" do
+        Facter.stubs(:value).with(:kernel).returns(:windows)
+        FileTest.stubs(:exists?).with("/system32/netsh.exe").returns(true)
+        Facter::Util::IP.find_exec('ipaddress', 'ipv4').should == "/system32/netsh.exe interface ip show interface"
+      end
+
+      [:freebsd, :netbsd, :openbsd, :sunos, :darwin, :"hp-ux", :"gnu/kfreebsd"].each do |platform|
+        it "should return appropriate executables on #{platform}" do
+          Facter.stubs(:value).with(:kernel).returns(platform)
+          Facter::Util::IP.find_exec('ipaddress', 'ipv4').should == "/sbin/ifconfig"
+        end
+      end
+    end
+
+  end
+
+  describe "the find_entry function" do
+    describe "for ipaddress" do
+      it "should return an appropriate token for ipconfig on linux for ipv4" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet addr: '
+      end
+
+      it "should return an appropriate token for ip on linux for ipv4" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv4', "/sbin/ip addr show").should == 'inet '
+      end
+
+      it "should return an appropriate token for ipconfig on linux for ipv6" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv6', "/sbin/ifconfig").should == 'inet6 addr: '
+      end
+
+      it "should return an appropriate token for ip on linux for ipv6" do
+        Facter.stubs(:value).with(:kernel).returns("Linux")
+        Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv6', "/sbin/ip addr show").should == 'inet6 '
+      end
+
+      [:sunos, :"hp-ux"].each do |platform|
+        it "should return an appropriate token for ipconfig on #{platform} for ipv4" do
+          Facter.stubs(:value).with(:kernel).returns(platform)
+          Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet '
+        end
+      end
+    end
+
+    [:freebsd, :netbsd, :openbsd, :darwin, :"gnu/kfreebsd"].each do |platform|
+      it "should return an appropriate token for ipconfig on #{platform} for ipv4" do
+        Facter.stubs(:value).with(:kernel).returns(platform)
+        Facter::Util::IP.find_entry('token', 'ipaddress', 'ipv4', "/sbin/ifconfig").should == 'inet addr: '
       end
     end
   end
