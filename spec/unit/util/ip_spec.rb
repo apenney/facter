@@ -49,7 +49,7 @@ describe Facter::Util::IP do
 
   it "should return a list three interfaces on HP-UX with three interfaces multiply reporting" do
     Facter.stubs(:value).with(:kernel).returns(:"hp-ux")
-    hpux_netstat = my_fixture_read("hpux_netstat_all_interfaces")
+    hpux_netstat = my_fixture_read("hpux_1131_netstat_in")
     Facter::Util::IP.stubs(:get_all_interface_output).returns(hpux_netstat)
     Facter::Util::IP.get_interfaces().should == ["lan1", "lan0", "lo0"]
   end

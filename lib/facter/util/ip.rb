@@ -195,7 +195,8 @@ module Facter::Util::IP
           },
         },
       },
-    :"hp-ux" => {
+    },
+    :'hp-ux' => {
       :methods => {
         :ipaddress => {
           :ipv4 => {
@@ -339,8 +340,7 @@ module Facter::Util::IP
         },
       },
     },
-  },
-}
+  }
 
   # Help find specific values in the INTERFACE_MAP nested hash to reduce boilerplate.
   def self.find_value(type, subtype)
