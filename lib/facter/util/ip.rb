@@ -38,6 +38,296 @@ module Facter::Util::IP
     }
   }
 
+  INTERFACE_MAP = {
+    :linux => {
+      :methods => {
+        :ipaddress => {
+          :ipv4 => {
+            :ip => {
+              :regex => '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',
+              :exec  => '/sbin/ip addr show',
+              :token => 'inet ',
+            },
+            :ifconfig => {
+              :regex  => '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',
+              :exec   => '/sbin/ifconfig',
+              :token  => 'inet addr: ',
+            },
+          },
+          :ipv6 => {
+            :ip => {
+              :regex => '((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})',
+              :exec  => '/sbin/ip addr show',
+              :token => 'inet6 ',
+            },
+            :ifconfig => {
+              :regex  => '((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})',
+              :exec   => '/sbin/ifconfig',
+              :token  => 'inet6 addr: ',
+            },
+          },
+        },
+        :macaddress => {
+          :ethernet => {
+            :ip => {
+              :exec  => '/sbin/ip addr show',
+              :regex => '(\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2})',
+              :token => 'link/ether ',
+            },
+            :ifconfig => {
+              :exec   => '/sbin/ifconfig',
+              :regex  => '(\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2})',
+              :token  => '(?:ether|HWaddr) ',
+            },
+          },
+        },
+        :netmask => {
+          :ipv4 => {
+            :ip => {
+              :exec  => '/sbin/ip addr show',
+              :regex => '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\/(\d+)',
+              :token => 'inet ',
+            },
+            :ifconfig => {
+              :exec   => '/sbin/ifconfig',
+              :regex  => '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',
+              :token  => 'Mask:',
+            },
+          },
+          :ipv6 => {
+            :ip => {
+              :regex => '(?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4}\/(\d+)',
+              :exec  => '/sbin/ip addr show',
+              :token => 'inet6 ',
+            },
+            :ifconfig => {
+              :regex  => '(?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4}\/(\d+)',
+              :exec   => '/sbin/ifconfig',
+              :token  => 'inet6 addr: ',
+            },
+          },
+        },
+      },
+    },
+    :bsdlike => {
+      :aliases  => [:openbsd, :netbsd, :freebsd, :darwin, :"gnu/kfreebsd", :dragonfly],
+      :methods => {
+        :ipaddress => {
+          :ipv4 => {
+            :ifconfig => {
+              :regex  => '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet addr: ',
+            },
+          },
+          :ipv6 => {
+            :ifconfig => {
+              :regex => '((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})',
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet6 addr: ',
+            },
+          },
+        },
+        :macaddress => {
+          :ethernet => {
+            :ifconfig => {
+              :exec  => '/sbin/ifconfig',
+              :regex  => '(\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2})',
+              :token  => '(?:ether|HWaddr) ',
+            },
+          },
+        },
+        :netmask => {
+          :ipv4 => {
+            :ifconfig => {
+              :exec   => '/sbin/ifconfig',
+              :regex  => '(\w+)',
+              :token  => 'netmask 0x',
+            },
+          },
+          :ipv6 => {
+            :ifconfig => {
+              :regex  => '(\w+)',
+              :exec   => '/sbin/ifconfig',
+              :token  => 'prefixlen ',
+            },
+          },
+        },
+      },
+    },
+    :sunos => {
+      :methods => {
+        :ipaddress => {
+          :ipv4 => {
+            :ifconfig => {
+              :regex  => '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet ',
+            },
+          },
+          :ipv6 => {
+            :ifconfig => {
+              :regex => '((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})',
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet6 ',
+            },
+          },
+        },
+        :macaddress => {
+          :ethernet => {
+            :ifconfig => {
+              :exec  => '/sbin/ifconfig',
+              :regex  => '(\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2})',
+              :token  => '(?:ether|HWaddr) ',
+            },
+          },
+        },
+        :netmask => {
+          :ipv4 => {
+            :ifconfig => {
+              :exec   => '/sbin/ifconfig',
+              :regex  => '(\w+)',
+              :token  => 'netmask ',
+            },
+          },
+          :ipv6 => {
+            :ifconfig => {
+              :regex => '(?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4}\/(\d+)',
+              :exec   => '/sbin/ifconfig',
+              :token  => 'inet6 ',
+            },
+          },
+        },
+      },
+    },
+    :"hp-ux" => {
+      :methods => {
+        :ipaddress => {
+          :ipv4 => {
+            :ifconfig => {
+              :regex  => '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet ',
+            },
+          },
+          :ipv6 => {
+            :ifconfig => {
+              :regex => '((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})',
+              :exec  => '/sbin/ifconfig',
+              :token => 'inet6 addr: ',
+            },
+          },
+        },
+        :macaddress => {
+          :ethernet => {
+            :lanscan => {
+              :exec  => '/sbin/lanscan -a',
+              :regex  => '(\w+)',
+              :token  => '0x',
+            },
+          },
+        },
+        :netmask => {
+          :ipv4 => {
+            :ifconfig => {
+              :exec   => '/sbin/ifconfig',
+              :regex  => '(\w+)',
+              :token  => 'netmask ',
+            },
+          },
+          :ipv6 => {
+            :ifconfig => {
+              :regex => '(?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4}\/(\d+)',
+              :exec   => '/sbin/ifconfig',
+              :token  => 'inet6 ',
+            },
+          },
+        },
+      },
+    },
+    :aix => {
+      :methods => {
+        :ipaddress => {
+          :ipv4 => {
+            :ifconfig => {
+              :regex  => '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',
+              :exec  => '/sbin/ifconfig -a',
+              :token => 'inet ',
+            },
+          },
+          :ipv6 => {
+            :ifconfig => {
+              :regex => '((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})',
+              :exec  => '/sbin/ifconfig -a',
+              :token => 'inet6 ',
+            },
+          },
+        },
+        :macaddress => {
+          :ethernet => {
+            :ifconfig => {
+              :exec  => '/sbin/ifconfig',
+              :regex  => '(\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2}:\w{1,2})',
+              :token  => '(?:ether|HWaddr) ',
+            },
+          },
+        },
+        :netmask => {
+          :ipv4 => {
+            :ifconfig => {
+              :exec   => '/sbin/ifconfig',
+              :regex  => '(\w+)',
+              :token  => 'netmask ',
+            },
+          },
+          :ipv6 => {
+            :ifconfig => {
+              :regex => '(?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4}\/(\d+)',
+              :exec   => '/sbin/ifconfig',
+              :token  => 'inet6 ',
+            },
+          },
+        },
+      },
+    },
+    :windows => {
+      :methods => {
+        :ipaddress => {
+          :ipv4 => {
+            :netsh => {
+              :regex  => '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',
+              :exec  => "#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ip show interface",
+              :token => 'IP Address:\s+',
+            },
+          },
+          :ipv6 => {
+            :netsh => {
+              :regex => '((?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4})',
+              :exec  => "#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ipv6 show interface",
+              :token => 'Address\s+',
+            },
+          },
+        },
+        :netmask => {
+          :ipv4 => {
+            :ifconfig => {
+              :exec  => "#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ip show interface",
+              :regex  => '([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)',
+              :token  => 'mask ',
+            },
+          },
+          :ipv6 => {
+            :ifconfig => {
+              :regex => '(?![fe80|::1])(?>[0-9,a-f,A-F]*\:{1,2})+[0-9,a-f,A-F]{0,4}%(\d+)',
+              :exec  => "#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ipv6 show interface",
+              :token  => 'Address\s+',
+            },
+          },
+        },
+      },
+    },
+  }
+
   # Convert an interface name into purely alphanumeric characters.
   def self.alphafy(interface)
     interface.gsub(/[^a-z0-9_]/i, '_')
