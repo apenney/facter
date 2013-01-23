@@ -450,7 +450,7 @@ module Facter::Util::IP
   end
 
   def self.supported_platforms
-    REGEX_MAP.inject([]) do |result, tmp|
+    INTERFACE_MAP.inject([]) do |result, tmp|
       key, map = tmp
       if map[:aliases]
         result += map[:aliases]
@@ -462,37 +462,53 @@ module Facter::Util::IP
   end
 
   def self.get_interfaces
-    return [] unless output = Facter::Util::IP.get_all_interface_output()
+    interfaces = []
+    case Facter.value(:kernel).downcase.to_sym
+    when :linux
+      # Linux lacks ifconfig -l so grub around in /proc/ for something to parse.
+      output = File.read('/proc/net/dev')
+      output.each_line do |line|
+        line.match(/\w+\d*:/) do |m|
+          interfaces << m.to_s.chomp(':') unless m.nil?
+        end
+      end
+      interfaces.sort!
+    when :freebsd, :netbsd, :openbsd, :dragonfly, :"gnu/kfreebsd", :darwin
+      # Same command is used for ipv4 and ipv6
+      exec = Facter::Util::IP.find_exec('ipaddress', 'ipv4')
+      return [] unless output = Facter::Util::Resolution.exec("#{exec} -l")
+      interfaces = output.scan(/\w+/)
+    else
+      return [] unless output = Facter::Util::IP.get_all_interface_output()
 
-    # windows interface names contain spaces and are quoted and can appear multiple
-    # times as ipv4 and ipv6
-    return output.scan(/\s* connected\s*(\S.*)/).flatten.uniq if Facter.value(:kernel) == 'windows'
-
-    # Our regex appears to be stupid, in that it leaves colons sitting
-    # at the end of interfaces.  So, we have to trim those trailing
-    # characters.  I tried making the regex better but supporting all
-    # platforms with a single regex is probably a bit too much.
-    output.scan(/^\S+/).collect { |i| i.sub(/:$/, '') }.uniq
+      # windows interface names contain spaces and are quoted and can appear multiple
+      # times as ipv4 and ipv6
+      if Facter.value(:kernel).downcase.to_sym == :windows
+        interfaces = output.scan(/\s* connected\s*(\S.*)/).flatten.uniq
+      else
+        # Our regex appears to be stupid, in that it leaves colons sitting
+        # at the end of interfaces.  So, we have to trim those trailing
+        # characters.  I tried making the regex better but supporting all
+        # platforms with a single regex is probably a bit too much.
+        interfaces = output.scan(/^\S+/).collect { |i| i.sub(/:$/, '') }.uniq
+      end
+    end
+    interfaces
   end
 
-  def self.get_all_interface_output
-    case Facter.value(:kernel)
-    when 'Linux', 'OpenBSD', 'NetBSD', 'FreeBSD', 'Darwin', 'GNU/kFreeBSD', 'DragonFly'
-      output = %x{/sbin/ifconfig -a 2>/dev/null}
-    when 'SunOS'
-      output = %x{/usr/sbin/ifconfig -a}
-    when 'HP-UX'
-      # (#17487)[https://projects.puppetlabs.com/issues/17487]
-      # Handle NIC bonding where asterisks and virtual NICs are printed.
-      if output = hpux_netstat_in
-        output.gsub!(/\*/, "")                  # delete asterisks.
-        output.gsub!(/^[^\n]*none[^\n]*\n/, "") # delete lines with 'none' instead of IPs.
-        output.sub!(/^[^\n]*\n/, "")            # delete the header line.
-        output
-      end
-    when 'windows'
-      output = %x|#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ip show interface|
-      output += %x|#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ipv6 show interface|
+  # Get a list of interfaces on the server.
+  def self.get_all_interface_output()
+    exec4 = Facter::Util::IP.find_exec('ipaddress', 'ipv4')
+    exec6 = Facter::Util::IP.find_exec('ipaddress', 'ipv6')
+
+    case Facter.value(:kernel).downcase.to_sym
+    when :solaris
+      output = Facter::Util::Resolution.exec(exec4)
+    when :"hp-ux"
+      output = %x{/bin/netstat -in | sed -e 1d}
+    when :windows
+      output = %x|#{exec4}|
+      output += %x|#{exec6}|
     end
     output
   end
@@ -529,49 +545,6 @@ module Facter::Util::IP
     %x{/sbin/ifconfig #{interface} 2>/dev/null}
   end
 
-  def self.get_single_interface_output(interface)
-    output = ""
-    case Facter.value(:kernel)
-    when 'OpenBSD', 'NetBSD', 'FreeBSD', 'Darwin', 'GNU/kFreeBSD', 'DragonFly'
-      output = Facter::Util::IP.ifconfig_interface(interface)
-    when 'Linux'
-      ifconfig_output = Facter::Util::IP.ifconfig_interface(interface)
-      if interface =~ /^ib/ then
-        real_mac_address = get_infiniband_macaddress(interface)
-        output = ifconfig_output.sub(%r{(?:ether|HWaddr)\s+((\w{1,2}:){5,}\w{1,2})}, "HWaddr #{real_mac_address}")
-      else
-        output = ifconfig_output
-      end
-    when 'SunOS'
-      output = %x{/usr/sbin/ifconfig #{interface}}
-    when 'HP-UX'
-       mac = ""
-       ifc = hpux_ifconfig_interface(interface)
-       hpux_lanscan.scan(/(\dx\S+).*UP\s+(\w+\d+)/).each {|i| mac = i[0] if i.include?(interface) }
-       mac = mac.sub(/0x(\S+)/,'\1').scan(/../).join(":")
-       output = ifc + "\n" + mac
-    end
-    output
-  end
-
-  def self.hpux_ifconfig_interface(interface)
-    Facter::Util::Resolution.exec("/usr/sbin/ifconfig #{interface}")
-  end
-
-  def self.hpux_lanscan
-    Facter::Util::Resolution.exec("/usr/sbin/lanscan")
-  end
-
-  def self.get_output_for_interface_and_label(interface, label)
-    return get_single_interface_output(interface) unless Facter.value(:kernel) == 'windows'
-
-    if label == 'ipaddress6'
-      output = %x|#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ipv6 show address \"#{interface}\"|
-    else
-      output = %x|#{ENV['SYSTEMROOT']}/system32/netsh.exe interface ip show address \"#{interface}\"|
-    end
-    output
-  end
 
   def self.get_bonding_master(interface)
     if Facter.value(:kernel) != 'Linux'
@@ -614,7 +587,26 @@ module Facter::Util::IP
   # returned if the kernel is not supported by the REGEX_MAP constant.
   def self.get_interface_value(interface, label)
     tmp1 = []
+    case label
+    when 'ipaddress'
+      return Facter::Util::IP::get_attribute(interface, label)
+    when 'ipaddress6'
+      return Facter::Util::IP::get_attribute(interface, label)
+    when 'macaddress'
+      bonddev = get_bonding_master(interface)
+      if bonddev
+        return Facter::Util::IP::get_bonding(interface)
+      else
+        return Facter::Util::IP::get_attribute(interface, label)
+      end
+    when 'netmask'
+      return Facter::Util::IP::get_attribute(interface, label)
+    when 'mtu'
+      return Facter::Util::IP::get_attribute(interface, label)
+    end
+  end
 
+  def get_bonding(interface)
     kernel = Facter.value(:kernel).downcase.to_sym
 
     # If it's not directly in the map or aliased in the map, then we don't know how to deal with it.
@@ -679,4 +671,5 @@ module Facter::Util::IP
       network = ip.mask(subnet.to_s).to_s
     end
   end
+
 end
