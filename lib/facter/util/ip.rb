@@ -97,6 +97,20 @@ module Facter::Util::IP
             },
           },
         },
+        :mtu => {
+          :ipv4 => {
+            :ip => {
+              :exec => '/sbin/ip addr show',
+              :regex => '(\d+)',
+              :token => 'MTU:',
+            },
+            :ifconfig => {
+              :exec => '/sbin/ip addr show',
+              :regex => '(\d+)',
+              :token => 'mtu ',
+            },
+          },
+        },
       },
     },
     :bsdlike => {
