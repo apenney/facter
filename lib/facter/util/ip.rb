@@ -332,6 +332,113 @@ module Facter::Util::IP
     },
   }
 
+  # Help find specific values in the INTERFACE_MAP nested hash to reduce boilerplate.
+  def self.find_value(type, subtype)
+    kernel = Facter.value(:kernel).downcase.to_sym
+    unless map = INTERFACE_MAP[kernel] || INTERFACE_MAP.values.find { |tmp| 
+      tmp[:aliases] and tmp[:aliases].include?(kernel) }
+      return []
+    end
+    return map[:methods][type.to_sym][subtype.to_sym]
+  end
+
+  # Extract the information from the output given a token, regex to parse and a regex of addresses to ignore.
+  def self.get_item_after_token(output, token, regex, ignore=/^127\./)
+    result = nil
+    output.scan(/#{token}#{regex}/).each do |match|
+      match = match.first
+      unless match =~ ignore
+        result = match
+      end
+    end
+    result
+  end
+
+  def self.find_exec(type, subtype)
+    exec = nil
+    methods = self.find_value(type, subtype)
+    methods.each do |name, method|
+      # Strip back to just the file if the exec method contains more detail.
+      if method[:exec]
+        file = method[:exec].split(' ').first
+        if FileTest.exists?(file)
+          exec = method[:exec]
+          break
+        end
+      end
+    end
+    return exec
+  end
+
+  def self.find_entry(item, type, subtype, exec)
+    entry = nil
+    return entry unless methods = self.find_value(type, subtype)
+    methods.each do |name, method|
+      if method[:exec] == exec
+        entry = method[item.to_sym]
+      end
+      break unless entry.nil?
+    end
+    entry
+  end
+
+  # Return the ipaddress of an interface.
+  def self.get_attribute(interface=nil, attribute='ipaddress', subtype='ipv4', ignore=/^127\./)
+    attr  = nil
+
+    exec  = Facter::Util::IP.find_exec(attribute, subtype)
+    token = Facter::Util::IP.find_entry('token', attribute, subtype, exec)
+    regex = Facter::Util::IP.find_entry('regex', attribute, subtype, exec)
+
+    command = "#{exec}"
+    command << " #{interface}" unless interface.nil?
+
+    # For the macaddress we have to handle things differently.
+    if attribute == 'macaddress'
+      macaddress = nil
+      # Read Linux directly from /sys/
+      case Facter.value(:kernel).downcase.to_sym
+      when :linux
+        return nil unless output = File.read("/sys/class/net/#{interface}/address")
+        macaddress = output
+      # In the case of HP-UX we need to cut off the number.
+      when :"hp-ux"
+        ppa = interface.slice(-1)
+        command = "#{exec} #{ppa}"
+      else
+        command = "#{exec} #{interface}"
+      end
+
+      output = Facter::Util::Resolution.exec(command)
+      unless output =~ /interface #{interface} does not exist/
+        macaddress = Facter::Util::IP.get_item_after_token(output, token, regex)
+      end
+      return macaddress
+    else
+      output = Facter::Util::Resolution.exec(command)
+      return [] if output.nil?
+      attr = Facter::Util::IP.get_item_after_token(output, token, regex, ignore)
+    end
+
+    # We need to do an extra conversion step for netmasks.
+    if attribute == 'netmask'
+      netmask = nil
+      # Check for a CIDR style match.
+      if attr.match(/^\d{1,2}$/)
+        netmask = Facter::Util::IP.cidr_to_netmask(attr)
+      # FreeBSD returns 0xff00ff00 and HP-UX returns just ff00ff00
+      elsif attr.match(/\w{8}/)
+        netmask = Facter::Util::IP::hex_to_netmask(attr)
+      else
+        netmask = attr
+      end
+      return netmask
+    end
+
+
+    return attr
+  end
+
   # Convert an interface name into purely alphanumeric characters.
   def self.alphafy(interface)
     interface.gsub(/[^a-z0-9_]/i, '_')
