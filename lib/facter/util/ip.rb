@@ -74,6 +74,26 @@ module Facter::Util::IP
     return method
   end
 
+  # Return the appropriate subhash for the mappings in ip/*
+  def self.find_submap(map)
+    kernel = Facter.value(:kernel).downcase.to_sym
+    submap = {}
+
+    # This is a little ugly, the intent is to check all the aliases
+    # as well as the main keys in order to fetch the right subhash.
+    map.keys.each do |k|
+      if k == kernel
+        submap = map[k]
+      elsif map[k][:aliases]
+        if map[k][:aliases].include?(kernel)
+          submap = map[k]
+        end
+      end
+    end
+    submap
+  end
+
+
   # Convert an interface name into purely alphanumeric characters.
   def self.alphafy(interface)
     interface.gsub(/[^a-z0-9_]/i, '_')

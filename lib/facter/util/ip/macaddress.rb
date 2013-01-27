@@ -60,18 +60,7 @@ module Facter::Util::IP
     return nil unless ip_version == 'ipv4' || ip_version == 'ipv6'
 
     macaddress = nil
-    kernel = Facter.value(:kernel).downcase.to_sym
-    map = {}
-
-    MAP.keys.each do |k|
-      if k == kernel
-        map = MAP[k]
-      elsif MAP[k][:aliases]
-        if MAP[k][:aliases].include?(kernel)
-          map = MAP[k]
-        end
-      end
-    end
+    map = Facter::Util::IP.find_submap(MAP)
 
     # This checks each exec in turn until one is found and then uses that
     # method for the rest of the matches.
