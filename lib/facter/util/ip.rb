@@ -61,7 +61,9 @@ module Facter::Util::IP
   def self.find_method(map)
     method = nil
     map.each do |name, option|
-      if option[:exec]
+      if name == :aliases
+        next
+      elsif option[:exec]
         # Strip back to just the file if the exec method contains arguments.
         if FileTest.exists?(option[:exec].split(' ').first)
           method = name
