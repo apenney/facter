@@ -98,7 +98,7 @@ describe Facter::Util::IP do
   it "should return macaddress with leading zeros stripped off for GNU/kFreeBSD" do
     kfreebsd_ifconfig = my_fixture_read("debian_kfreebsd_ifconfig")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("em0").returns(kfreebsd_ifconfig)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig em0').returns(kfreebsd_ifconfig)
     Facter.stubs(:value).with(:kernel).returns("GNU/kFreeBSD")
 
     Facter::Util::IP.get_interface_value("em0", "macaddress").should == "0:11:a:59:67:90"
@@ -116,7 +116,7 @@ describe Facter::Util::IP do
   it "should return macaddress information for OS X" do
     ifconfig_interface = my_fixture_read("Mac_OS_X_10.5.5_ifconfig")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("en1").returns(ifconfig_interface)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig en1').returns(ifconfig_interface)
     Facter.stubs(:value).with(:kernel).returns("Darwin")
 
     Facter::Util::IP.get_interface_value("en1", "macaddress").should == "00:1b:63:ae:02:66"
@@ -368,7 +368,7 @@ describe Facter::Util::IP do
 
       it "should return MAC address #{expected_mac} on #{nic} for #{description} example" do
         Facter.stubs(:value).with(:kernel).returns("HP-UX")
-        Facter::Util::IP.stubs(:hpux_lanscan).returns(lanscan_fixture)
+        FileTest.stubs(:exists?).with('/usr/sbin/ifconfig').returns(true)
         Facter::Util::Resolution.stubs(:exec).returns(ifconfig_fixture)
         Facter::Util::IP.get_interface_value(nic, "macaddress").should == expected_mac
       end

@@ -2,6 +2,7 @@
 # information from all kinds of platforms.
 module Facter::Util::IP
   require 'facter/util/ip/ipaddress'
+  require 'facter/util/ip/macaddress'
   # A map of all the different regexes that work for
   # a given platform or set of platforms.
   REGEX_MAP = {
@@ -247,6 +248,8 @@ module Facter::Util::IP
   def self.get_interface_value(interface, label)
     if label == 'ipaddress'
       return Facter::Util::IP::Ipaddress.get(interface)
+    elsif label == 'macaddress'
+      return Facter::Util::IP::Macaddress.get(interface)
     end
 
     tmp1 = []
