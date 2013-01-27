@@ -107,7 +107,7 @@ describe Facter::Util::IP do
   it "should return interface information for FreeBSD supported via an alias" do
     ifconfig_interface = my_fixture_read("6.0-STABLE_FreeBSD_ifconfig")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("fxp0").returns(ifconfig_interface)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig fxp0').returns(ifconfig_interface)
     Facter.stubs(:value).with(:kernel).returns("FreeBSD")
 
     Facter::Util::IP.get_interface_value("fxp0", "macaddress").should == "00:0e:0c:68:67:7c"
@@ -161,7 +161,9 @@ describe Facter::Util::IP do
   it "should return correct macaddress information for infiniband on Linux" do
     correct_ifconfig_interface = my_fixture_read("linux_get_single_interface_ib0")
 
-    Facter::Util::IP.expects(:get_single_interface_output).with("ib0").returns(correct_ifconfig_interface)
+    FileTest.stubs(:exists?).with('/sbin/ifconfig').returns(true)
+    FileTest.stubs(:exists?).with('/sbin/ip').returns(false)
+    Facter::Util::Resolution.stubs(:exec).with('/sbin/ifconfig ib0').returns(correct_ifconfig_interface)
     Facter.stubs(:value).with(:kernel).returns("Linux")
 
     Facter::Util::IP.get_interface_value("ib0", "macaddress").should == "80:00:00:4a:fe:80:00:00:00:00:00:00:00:02:c9:03:00:43:27:21"
@@ -368,8 +370,8 @@ describe Facter::Util::IP do
 
       it "should return MAC address #{expected_mac} on #{nic} for #{description} example" do
         Facter.stubs(:value).with(:kernel).returns("HP-UX")
-        FileTest.stubs(:exists?).with('/usr/sbin/ifconfig').returns(true)
-        Facter::Util::Resolution.stubs(:exec).returns(ifconfig_fixture)
+        FileTest.stubs(:exists?).with('/usr/sbin/lanscan').returns(true)
+        Facter::Util::Resolution.stubs(:exec).returns(lanscan_fixture)
         Facter::Util::IP.get_interface_value(nic, "macaddress").should == expected_mac
       end
     end
